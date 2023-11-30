@@ -20,6 +20,7 @@ import itertools
 
 import numpy as np
 import pandas as pd
+import tqdm.autonotebook as tqdm
 
 from feedx import experiment_analysis
 from feedx import experiment_design
@@ -216,7 +217,7 @@ def _bootstrap_sample_data(
       np.arange
   )
   exploded_data = (
-      copied_data.explode(dummy_list_column, ignore_index=True)
+      copied_data.explode(dummy_list_column)
       .dropna(axis=0, subset=[dummy_list_column])
       .drop(columns=[dummy_list_column, sample_weight_column])
   )
@@ -358,10 +359,14 @@ class SimulationAnalysis:
     time_period_column: The column name that will be used internally to identify
       the time period. This column name must not already exist in the data.
       Defaults to "time_period".
+    treatment_column: The column name that will be used internally to set the
+      treatment assignment. This column name must not already exist in the data.
+      Defaults to "treatment".
     minimum_start_week_id: The minimum start week ID that can be used for the
       simulations.
     maximum_start_week_id: The maximum start week ID that can be used for the
       simulations.
+    valid_start_week_ids: The valid start week ids for this simulation.
     rng: The random number generator used for these simulations.
     minimum_detectable_effect: The smallest detectable improvement that can be
       reliably measured in this experiment. None if
@@ -396,6 +401,7 @@ class SimulationAnalysis:
   maximum_start_week_id: int = dataclasses.field(repr=False, init=False)
   rng: np.random.Generator = dataclasses.field(repr=False)
   time_period_column: str = dataclasses.field(repr=False, default="time_period")
+  treatment_column: str = dataclasses.field(repr=False, default="treatment")
 
   minimum_detectable_effect: float | None = dataclasses.field(
       default=None, init=False
@@ -434,24 +440,32 @@ class SimulationAnalysis:
     maximum_week_id = self.historical_data[self.week_id_column].max()
     self.maximum_start_week_id = maximum_week_id - self.design.runtime_weeks + 1
 
-  def _get_data_for_primary_metric_stats(
-      self,
-      start_week_id: int,
+  @property
+  def valid_start_week_ids(self) -> range:
+    return range(self.minimum_start_week_id, self.maximum_start_week_id + 1)
+
+  def _get_pivoted_and_trimmed_historical_data(
+      self, start_week_id: int, bootstrap_sample: bool = False
   ) -> pd.DataFrame:
     """Prepares the historical data for calculating the statistics.
 
     It pivots the dataset so that it has one item id per row, and then if
     required perfoms any trimming based on the pretest data.
 
+    Bootstrap sampling can be applid, which is used for the simulations.
+
     Args:
       start_week_id: The start week id for this simulation.
+      bootstrap_sample: Whether to bootstrap sample the historical data before
+        estimating the stats. Defaults to false.
 
     Returns:
       The pivoted and trimmed historical data.
 
     Raises:
       RuntimeError: If the number of samples in the historical data does not
-        match the number of samples in the design.
+        match the number of samples in the design and it is not a bootstrap
+        sample.
     """
     pivoted_data = experiment_analysis.pivot_time_assignment(
         self.historical_data,
@@ -463,7 +477,12 @@ class SimulationAnalysis:
         time_period_column=self.time_period_column,
     )[self.design.primary_metric]
 
-    if len(pivoted_data.index.values) != self.design.n_items_before_trimming:
+    if bootstrap_sample:
+      pivoted_data = _bootstrap_sample_data(pivoted_data, self.rng)
+
+    if (not bootstrap_sample) and (
+        len(pivoted_data.index.values) != self.design.n_items_before_trimming
+    ):
       raise RuntimeError(
           "Unexpected number of items before trimming. Design expects "
           f"{self.design.n_items_before_trimming:,}, but historical data has "
@@ -479,7 +498,9 @@ class SimulationAnalysis:
           rng=self.rng,
       )
 
-    if len(pivoted_data.index.values) != self.design.n_items_after_pre_trim:
+    if (not bootstrap_sample) and (
+        len(pivoted_data.index.values) != self.design.n_items_after_pre_trim
+    ):
       raise RuntimeError(
           "Unexpected number of items after pre-trimming. Design expects "
           f"{self.design.n_items_after_pre_trim:,}, but historical data has "
@@ -506,9 +527,11 @@ class SimulationAnalysis:
 
     Raises:
       RuntimeError: If the sample size does not match the expected sample size
-        in the design.
+        in the design and it is not a bootstrap sample.
     """
-    pivoted_data = self._get_data_for_primary_metric_stats(start_week_id)
+    pivoted_data = self._get_pivoted_and_trimmed_historical_data(
+        start_week_id, bootstrap_sample=False
+    )
 
     if self.design.is_crossover:
       stacked_values = np.stack([
@@ -568,11 +591,8 @@ class SimulationAnalysis:
       RuntimeError: If the calculations do not have the same sample size for
         every start week. This may happen if the input data is missing rows.
     """
-    valid_start_weeks = range(
-        self.minimum_start_week_id, self.maximum_start_week_id + 1
-    )
     primary_metric_stats = list(
-        map(self._estimate_primary_metric_stats, valid_start_weeks)
+        map(self._estimate_primary_metric_stats, self.valid_start_week_ids)
     )
     primary_metric_averages, primary_metric_variances, sample_sizes = zip(
         *primary_metric_stats
@@ -683,3 +703,107 @@ class SimulationAnalysis:
     self.primary_metric_standard_deviation = primary_metric_standard_deviation
     self.minimum_detectable_effect = minimum_detectable_effect
     self.relative_minimum_detectable_effect = relative_minimum_detectable_effect
+
+  def validate_design(
+      self, n_simulations: int = 1000, progress_bar: bool = True
+  ) -> None:
+    """Runs a range of simulation tests to validate the experiment design.
+
+    These simulations are designed to test that the historical data is meeting
+    the distributional assumptions made by the statistical tests used. If these
+    validations fail, then this design should not be used.
+
+    This simulates many A/A experiments and synthetic A/B experiments to
+    perform the validation.
+
+    The A/A experiments are simulated by:
+      1. Sampling the historical data with replacement.
+      2. Selecting a start week id at random.
+      3. Randomly splitting the items into control and treatment.
+      4. Analyzing the primary metric based on the experiment design.
+
+    The A/B experiments are simulated by:
+      1. Sampling the historical data with replacement.
+      2. Selecting a start week id at random.
+      3. Randomly splitting the items into control and treatment.
+      4. Applying a synthetic treatment effect to the primary metric when it
+         is treated. The effect size is the estimated minimum detectable
+         effect.
+      5. Analyzing the primary metric based on the experiment design.
+
+    The validation checks the following:
+
+    The A/A tests should have uniformly distributed p-values, and should return
+    a statistically significant result design.alpha percent of the time. The
+    absolute difference between the primary metric in control and treatment
+    should be 0 on average.
+
+    The A/B tests should return a statistically significant result design.power
+    percent of the time. The absolute difference between the primary metric in
+    control and treatment should be equal to the estimated minimum detectable
+    effect.
+
+    Args:
+      n_simulations: The number of experiments to simulate. Defaults to 1000.
+      progress_bar: Whether to show a progress bar or not. Defaults to True.
+
+    Raises:
+      RuntimeError: If this is called before the
+        estimate_minimum_detectable_effect() method.
+    """
+    if self.minimum_detectable_effect is None:
+      raise RuntimeError(
+          "Cannot run validate_design() before"
+          " estimate_minimum_detectable_effect()."
+      )
+
+    aa_simulation_results_list = []
+    ab_simulation_results_list = []
+
+    if progress_bar:
+      simulations_iterator = tqdm.trange(
+          n_simulations, desc=f"Validating {self.design.design_id}"
+      )
+    else:
+      simulations_iterator = range(n_simulations)
+
+    for _ in simulations_iterator:
+      start_week_id = self.rng.choice(self.valid_start_week_ids)
+      simulated_aa_test_data = (
+          self._get_pivoted_and_trimmed_historical_data(
+              start_week_id, bootstrap_sample=True
+          )
+          .reset_index()
+          .pipe(
+              apply_random_treatment_assignment,
+              rng=self.rng,
+              item_id_column=self.item_id_column,
+              treatment_column=self.treatment_column,
+          )
+      )
+
+      aa_simulation_results_list.append(
+          experiment_analysis.analyze_experiment(
+              simulated_aa_test_data, self.design
+          )
+      )
+
+      simulated_ab_test_data = apply_synthetic_treatment_effect(
+          simulated_aa_test_data,
+          design=self.design,
+          effect_size=self.minimum_detectable_effect,
+          treatment_column=self.treatment_column,
+      )
+
+      ab_simulation_results_list.append(
+          experiment_analysis.analyze_experiment(
+              simulated_ab_test_data, self.design
+          )
+      )
+
+    self.aa_simulation_results = pd.DataFrame.from_records(
+        map(dataclasses.asdict, aa_simulation_results_list)
+    )
+    self.ab_simulation_results = pd.DataFrame.from_records(
+        map(dataclasses.asdict, ab_simulation_results_list)
+    )

@@ -189,6 +189,8 @@ def _pivot_regular_time_assignment(
 
   pivoted_data.loc[:, pd.IndexSlice[:, "test"]] /= runtime_weeks
 
+  data.drop(columns=[time_period_column], inplace=True)
+
   return pivoted_data
 
 
@@ -289,6 +291,8 @@ def _pivot_crossover_time_assignment(
 
   pivoted_data.loc[:, pd.IndexSlice[:, "test_1"]] /= test_period_weeks
   pivoted_data.loc[:, pd.IndexSlice[:, "test_2"]] /= test_period_weeks
+
+  data.drop(columns=[time_period_column], inplace=True)
 
   return pivoted_data
 

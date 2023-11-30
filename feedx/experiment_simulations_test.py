@@ -393,6 +393,13 @@ class SimulationAnalysisTests(parameterized.TestCase):
         ),
     })
 
+    rng = np.random.default_rng(0)
+    self.big_historical_data = pd.DataFrame({
+        "item_id": list(range(60)) * 6,
+        "week_id": sorted(list(range(6)) * 60),
+        "clicks": rng.integers(0, 10, 60 * 6),
+    })
+
   @mock_experiment_design_validation
   def test_after_instantiating_all_analysis_result_attributes_are_none(
       self, mock_validate_design
@@ -630,6 +637,296 @@ class SimulationAnalysisTests(parameterized.TestCase):
     self.assertAlmostEqual(
         results.minimum_detectable_effect / results.primary_metric_average,
         results.relative_minimum_detectable_effect,
+    )
+
+  @mock_experiment_design_validation
+  def test_cannot_run_validate_design_before_estimate_minimum_detectable_effect(
+      self,
+      mock_validate_design,
+  ):
+    design = ExperimentDesign(
+        n_items_before_trimming=5,
+        is_crossover=False,
+        runtime_weeks=4,
+        pretest_weeks=1,
+        pre_trim_top_percentile=0.0,
+        pre_trim_bottom_percentile=0.0,
+        post_trim_percentile=0.0,
+        primary_metric="clicks",
+        crossover_washout_weeks=1,
+    )
+
+    results = experiment_simulations.SimulationAnalysis(
+        design=design,
+        historical_data=self.historical_data,
+        minimum_start_week_id=2,
+        week_id_column="week_id",
+        item_id_column="item_id",
+        rng=np.random.default_rng(0),
+    )
+    with self.assertRaisesWithLiteralMatch(
+        RuntimeError,
+        "Cannot run validate_design() before"
+        " estimate_minimum_detectable_effect().",
+    ):
+      results.validate_design(n_simulations=5)
+
+  @parameterized.parameters(True, False)
+  def test_validate_design_can_be_run_with_or_without_progress_bar(
+      self, is_crossover
+  ):
+    design = ExperimentDesign(
+        n_items_before_trimming=60,
+        is_crossover=is_crossover,
+        runtime_weeks=6,
+        pretest_weeks=0,
+        pre_trim_top_percentile=0.0,
+        pre_trim_bottom_percentile=0.0,
+        post_trim_percentile=0.0,
+        primary_metric="clicks",
+        crossover_washout_weeks=1,
+    )
+
+    results_without_pbar = experiment_simulations.SimulationAnalysis(
+        design=design,
+        historical_data=self.big_historical_data,
+        minimum_start_week_id=0,
+        week_id_column="week_id",
+        item_id_column="item_id",
+        rng=np.random.default_rng(0),
+    )
+    results_without_pbar.estimate_minimum_detectable_effect()
+    results_without_pbar.validate_design(n_simulations=5, progress_bar=False)
+
+    results_with_pbar = experiment_simulations.SimulationAnalysis(
+        design=design,
+        historical_data=self.big_historical_data,
+        minimum_start_week_id=0,
+        week_id_column="week_id",
+        item_id_column="item_id",
+        rng=np.random.default_rng(0),
+    )
+    results_with_pbar.estimate_minimum_detectable_effect()
+    results_with_pbar.validate_design(n_simulations=5, progress_bar=True)
+
+    all_simulation_results_with_pbar = pd.concat(
+        [
+            results_with_pbar.aa_simulation_results,
+            results_with_pbar.ab_simulation_results,
+        ],
+        axis=1,
+    )
+    all_simulation_results_without_pbar = pd.concat(
+        [
+            results_without_pbar.aa_simulation_results,
+            results_without_pbar.ab_simulation_results,
+        ],
+        axis=1,
+    )
+
+    pd.testing.assert_frame_equal(
+        all_simulation_results_with_pbar,
+        all_simulation_results_without_pbar,
+    )
+
+  def test_validate_design_produces_aa_simulation_results_with_expected_columns(
+      self,
+  ):
+    design = ExperimentDesign(
+        n_items_before_trimming=60,
+        is_crossover=False,
+        runtime_weeks=6,
+        pretest_weeks=0,
+        pre_trim_top_percentile=0.0,
+        pre_trim_bottom_percentile=0.0,
+        post_trim_percentile=0.0,
+        primary_metric="clicks",
+    )
+
+    results = experiment_simulations.SimulationAnalysis(
+        design=design,
+        historical_data=self.big_historical_data,
+        minimum_start_week_id=0,
+        week_id_column="week_id",
+        item_id_column="item_id",
+        rng=np.random.default_rng(0),
+    )
+    results.estimate_minimum_detectable_effect()
+    results.validate_design(n_simulations=5)
+
+    expected_columns = [
+        "is_significant",
+        "alpha",
+        "p_value",
+        "statistic",
+        "absolute_difference",
+        "absolute_difference_lower_bound",
+        "absolute_difference_upper_bound",
+        "relative_difference",
+        "relative_difference_lower_bound",
+        "relative_difference_upper_bound",
+        "standard_error",
+        "sample_size",
+        "degrees_of_freedom",
+        "control_average",
+    ]
+    self.assertCountEqual(
+        results.aa_simulation_results.columns.values, expected_columns
+    )
+
+  def test_validate_design_produces_aa_simulation_results_with_expected_number_of_rows(
+      self,
+  ):
+    design = ExperimentDesign(
+        n_items_before_trimming=60,
+        is_crossover=False,
+        runtime_weeks=6,
+        pretest_weeks=0,
+        pre_trim_top_percentile=0.0,
+        pre_trim_bottom_percentile=0.0,
+        post_trim_percentile=0.0,
+        primary_metric="clicks",
+    )
+
+    results = experiment_simulations.SimulationAnalysis(
+        design=design,
+        historical_data=self.big_historical_data,
+        minimum_start_week_id=0,
+        week_id_column="week_id",
+        item_id_column="item_id",
+        rng=np.random.default_rng(0),
+    )
+    results.estimate_minimum_detectable_effect()
+    results.validate_design(n_simulations=5)
+
+    self.assertLen(results.aa_simulation_results.index.values, 5)
+
+  def test_validate_design_produces_ab_simulation_results_with_expected_columns(
+      self,
+  ):
+    design = ExperimentDesign(
+        n_items_before_trimming=60,
+        is_crossover=False,
+        runtime_weeks=6,
+        pretest_weeks=0,
+        pre_trim_top_percentile=0.0,
+        pre_trim_bottom_percentile=0.0,
+        post_trim_percentile=0.0,
+        primary_metric="clicks",
+    )
+
+    results = experiment_simulations.SimulationAnalysis(
+        design=design,
+        historical_data=self.big_historical_data,
+        minimum_start_week_id=0,
+        week_id_column="week_id",
+        item_id_column="item_id",
+        rng=np.random.default_rng(0),
+    )
+    results.estimate_minimum_detectable_effect()
+    results.validate_design(n_simulations=5)
+
+    expected_columns = [
+        "is_significant",
+        "alpha",
+        "p_value",
+        "statistic",
+        "absolute_difference",
+        "absolute_difference_lower_bound",
+        "absolute_difference_upper_bound",
+        "relative_difference",
+        "relative_difference_lower_bound",
+        "relative_difference_upper_bound",
+        "standard_error",
+        "sample_size",
+        "degrees_of_freedom",
+        "control_average",
+    ]
+    self.assertCountEqual(
+        results.ab_simulation_results.columns.values, expected_columns
+    )
+
+  def test_validate_design_produces_ab_simulation_results_with_expected_number_of_rows(
+      self,
+  ):
+    design = ExperimentDesign(
+        n_items_before_trimming=60,
+        is_crossover=False,
+        runtime_weeks=6,
+        pretest_weeks=0,
+        pre_trim_top_percentile=0.0,
+        pre_trim_bottom_percentile=0.0,
+        post_trim_percentile=0.0,
+        primary_metric="clicks",
+    )
+
+    results = experiment_simulations.SimulationAnalysis(
+        design=design,
+        historical_data=self.big_historical_data,
+        minimum_start_week_id=0,
+        week_id_column="week_id",
+        item_id_column="item_id",
+        rng=np.random.default_rng(0),
+    )
+    results.estimate_minimum_detectable_effect()
+    results.validate_design(n_simulations=5)
+
+    self.assertLen(results.ab_simulation_results.index.values, 5)
+
+  def test_validate_design_p_values_are_different_for_each_aa_simulation(self):
+    design = ExperimentDesign(
+        n_items_before_trimming=60,
+        is_crossover=False,
+        runtime_weeks=6,
+        pretest_weeks=0,
+        pre_trim_top_percentile=0.0,
+        pre_trim_bottom_percentile=0.0,
+        post_trim_percentile=0.0,
+        primary_metric="clicks",
+    )
+
+    results = experiment_simulations.SimulationAnalysis(
+        design=design,
+        historical_data=self.big_historical_data,
+        minimum_start_week_id=0,
+        week_id_column="week_id",
+        item_id_column="item_id",
+        rng=np.random.default_rng(0),
+    )
+    results.estimate_minimum_detectable_effect()
+    results.validate_design(n_simulations=5)
+
+    first_p_value = results.aa_simulation_results.loc[0, "p_value"]
+    self.assertFalse(
+        np.all(results.aa_simulation_results["p_value"] == first_p_value)
+    )
+
+  def test_validate_design_p_values_are_different_for_each_ab_simulation(self):
+    design = ExperimentDesign(
+        n_items_before_trimming=60,
+        is_crossover=False,
+        runtime_weeks=6,
+        pretest_weeks=0,
+        pre_trim_top_percentile=0.0,
+        pre_trim_bottom_percentile=0.0,
+        post_trim_percentile=0.0,
+        primary_metric="clicks",
+    )
+
+    results = experiment_simulations.SimulationAnalysis(
+        design=design,
+        historical_data=self.big_historical_data,
+        minimum_start_week_id=0,
+        week_id_column="week_id",
+        item_id_column="item_id",
+        rng=np.random.default_rng(0),
+    )
+    results.estimate_minimum_detectable_effect()
+    results.validate_design(n_simulations=5)
+
+    first_p_value = results.aa_simulation_results.loc[0, "p_value"]
+    self.assertFalse(
+        np.all(results.ab_simulation_results["p_value"] == first_p_value)
     )
 
 
