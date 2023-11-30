@@ -264,6 +264,82 @@ def apply_random_treatment_assignment(
   return data
 
 
+def _apply_synthetic_treatment_effect_to_regular_experiment(
+    pivoted_data: pd.DataFrame, effect_size: float, treatment_column: str
+) -> pd.DataFrame:
+  is_treated = pivoted_data[treatment_column] == 1
+  pivoted_data.loc[is_treated, "test"] += effect_size
+  return pivoted_data
+
+
+def _apply_synthetic_treatment_effect_to_crossover_experiment(
+    pivoted_data: pd.DataFrame, effect_size: float, treatment_column: str
+) -> pd.DataFrame:
+  is_treated = pivoted_data[treatment_column] == 1
+  pivoted_data.loc[is_treated, "test_1"] += effect_size
+  pivoted_data.loc[~is_treated, "test_2"] += effect_size
+  return pivoted_data
+
+
+def apply_synthetic_treatment_effect(
+    pivoted_data: pd.DataFrame,
+    *,
+    design: ExperimentDesign,
+    effect_size: float,
+    treatment_column: str,
+) -> pd.DataFrame:
+  """Applies the synthetic treatment effect to the dataframe.
+
+  If the design is a crossover design, then the pivoted_data should contain
+  columns named "test_1" and "test_2" which contain the metric to add a
+  synthetic treatment effect to. If the design is a regular design then the
+  pivoted_data should contain a single column named "test" which contains the
+  metric to apply the synthetic treatment effect to.
+
+  The synthetic treatment will increase the metric by the effect_size for
+  treatment when they have treatment applied. For a regular experiment, this
+  is all the items where treatment_column = 1. For a crossover experiment, this
+  is all the items where treatment_column = 1 for test_1, and all the columns
+  where treatment_column = 0 for test_2.
+
+  Args:
+    pivoted_data: The dataframe to apply the synthetic treatment to. Must
+      include the treatment_column, as well as "test" if it is not a crossover
+      design, or "test_1" and "test_2" if it is a crossover design.
+    design: The experiment design being simulated, with the is_crossover
+      attribute dictating whether this is a crossover design or regular design.
+    effect_size: The effect size to apply to the metric when it is treated.
+    treatment_column: The column name that has the treatment status in the data.
+
+  Returns:
+    The dataframe with the synthetic treatment effect applied.
+
+  Raises:
+    ValueError: If the pivoted_data is missing any required columns.
+  """
+  required_columns = {treatment_column}
+  if design.is_crossover:
+    required_columns.update({"test_1", "test_2"})
+  else:
+    required_columns.add("test")
+
+  missing_columns = required_columns - set(pivoted_data.columns)
+  if missing_columns:
+    raise ValueError(
+        "The pivoted_data is missing the following required columns: "
+        f"{missing_columns}"
+    )
+
+  if design.is_crossover:
+    return _apply_synthetic_treatment_effect_to_crossover_experiment(
+        pivoted_data, effect_size, treatment_column
+    )
+  else:
+    return _apply_synthetic_treatment_effect_to_regular_experiment(
+        pivoted_data, effect_size, treatment_column
+    )
+
+
 @dataclasses.dataclass
 class SimulationAnalysis:
   """A simultation analysis of the experiment design using historical data.

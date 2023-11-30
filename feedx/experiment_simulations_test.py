@@ -256,6 +256,116 @@ class ApplyRandomTreatmentAssignmentTests(parameterized.TestCase):
       )
 
 
+class SyntheticTreatmentEffectTest(parameterized.TestCase):
+
+  def setUp(self):
+    super().setUp()
+
+    self.irrelevent_design_args = dict(
+        n_items_before_trimming=400,
+        runtime_weeks=4,
+        pretest_weeks=1,
+        pre_trim_top_percentile=0.0,
+        pre_trim_bottom_percentile=0.0,
+        post_trim_percentile=0.0,
+        primary_metric="clicks",
+        crossover_washout_weeks=1,
+    )
+
+  def test_apply_synthetic_treatment_effect_for_a_regular_experiment(self):
+    pivoted_data = pd.DataFrame({
+        "item_id": [1, 2, 3, 4],
+        "treatment": [0, 1, 0, 1],
+        "test": [0.0, 0.1, 0.5, 0.2],
+    })
+    design = ExperimentDesign(is_crossover=False, **self.irrelevent_design_args)
+
+    actual_data = experiment_simulations.apply_synthetic_treatment_effect(
+        pivoted_data,
+        design=design,
+        effect_size=0.5,
+        treatment_column="treatment",
+    )
+    expected_data = pd.DataFrame({
+        "item_id": [1, 2, 3, 4],
+        "treatment": [0, 1, 0, 1],
+        "test": [0.0, 0.6, 0.5, 0.7],
+    })
+
+    pd.testing.assert_frame_equal(actual_data, expected_data)
+
+  def test_apply_synthetic_treatment_effect_for_a_crossover_experiment(self):
+    pivoted_data = pd.DataFrame({
+        "item_id": [1, 2, 3, 4],
+        "treatment": [0, 1, 0, 1],
+        "test_1": [0.0, 0.1, 0.5, 0.2],
+        "test_2": [0.3, 0.2, 0.9, 0.8],
+    })
+    design = ExperimentDesign(is_crossover=True, **self.irrelevent_design_args)
+
+    actual_data = experiment_simulations.apply_synthetic_treatment_effect(
+        pivoted_data,
+        design=design,
+        effect_size=0.5,
+        treatment_column="treatment",
+    )
+    expected_data = pd.DataFrame({
+        "item_id": [1, 2, 3, 4],
+        "treatment": [0, 1, 0, 1],
+        "test_1": [0.0, 0.6, 0.5, 0.7],
+        "test_2": [0.8, 0.2, 1.4, 0.8],
+    })
+
+    pd.testing.assert_frame_equal(actual_data, expected_data)
+
+  @parameterized.parameters(["treatment", "test"])
+  def test_apply_synthetic_treatment_effect_raises_if_required_column_missing_for_regular_experiment(
+      self, required_column
+  ):
+    pivoted_data = pd.DataFrame({
+        "item_id": [1, 2, 3, 4],
+        "treatment": [0, 1, 0, 1],
+        "test": [0.0, 0.1, 0.5, 0.2],
+    }).drop(required_column, axis=1)
+    design = ExperimentDesign(is_crossover=False, **self.irrelevent_design_args)
+
+    with self.assertRaisesRegex(
+        ValueError,
+        "The pivoted_data is missing the following required columns:"
+        f" {{'{required_column}'}}",
+    ):
+      experiment_simulations.apply_synthetic_treatment_effect(
+          pivoted_data,
+          design=design,
+          effect_size=0.5,
+          treatment_column="treatment",
+      )
+
+  @parameterized.parameters(["treatment", "test_1", "test_2"])
+  def test_apply_synthetic_treatment_effect_raises_if_required_column_missing_for_crossover_experiment(
+      self, required_column
+  ):
+    pivoted_data = pd.DataFrame({
+        "item_id": [1, 2, 3, 4],
+        "treatment": [0, 1, 0, 1],
+        "test_1": [0.0, 0.1, 0.5, 0.2],
+        "test_2": [0.3, 0.2, 0.9, 0.8],
+    }).drop(required_column, axis=1)
+    design = ExperimentDesign(is_crossover=True, **self.irrelevent_design_args)
+
+    with self.assertRaisesRegex(
+        ValueError,
+        "The pivoted_data is missing the following required columns:"
+        f" {{'{required_column}'}}",
+    ):
+      experiment_simulations.apply_synthetic_treatment_effect(
+          pivoted_data,
+          design=design,
+          effect_size=0.5,
+          treatment_column="treatment",
+      )
+
+
 # The experiment design object validates that there are at least 50
 # samples for the experiment, to ensure that the statistics will hold.
 # We mock this so we can test with small data.
