@@ -207,6 +207,7 @@ class DataValidationTests(parameterized.TestCase):
         "date": pd.to_datetime(
             ["2023-10-01", "2023-10-01", "2023-10-02", "2023-10-02"]
         ),
+        "date_id": [1, 1, 2, 2],
         "item_id": ["1", "2", "1", "2"],
         "clicks": [1, 2, 3, 4],
     })
@@ -215,6 +216,7 @@ class DataValidationTests(parameterized.TestCase):
         historical_data,
         item_id_column="item_id",
         date_column="date",
+        date_id_column="date_id",
         primary_metric_column="clicks",
     )
 
@@ -223,6 +225,7 @@ class DataValidationTests(parameterized.TestCase):
         "date": pd.to_datetime(
             ["2023-10-01", "2023-10-01", "2023-10-08", "2023-10-08"]
         ),
+        "date_id": [1, 1, 2, 2],
         "item_id": ["1", "2", "1", "2"],
         "clicks": [1, 2, 3, 4],
     })
@@ -231,6 +234,7 @@ class DataValidationTests(parameterized.TestCase):
         historical_data,
         item_id_column="item_id",
         date_column="date",
+        date_id_column="date_id",
         primary_metric_column="clicks",
     )
 
@@ -243,6 +247,7 @@ class DataValidationTests(parameterized.TestCase):
             "2023-10-02",
             "2023-10-02",
         ]),
+        "date_id": [1, 1, 2, 2, 2],
         "item_id": ["1", "2", "1", "2", "2"],
         "clicks": [1, 2, 3, 4, 5],
     })
@@ -252,12 +257,14 @@ class DataValidationTests(parameterized.TestCase):
           bad_historical_data,
           item_id_column="item_id",
           date_column="date",
+          date_id_column="date_id",
           primary_metric_column="clicks",
       )
 
   def test_historical_data_must_have_every_item_and_date_combination(self):
     bad_historical_data = pd.DataFrame({
         "date": pd.to_datetime(["2023-10-01", "2023-10-01", "2023-10-02"]),
+        "date_id": [1, 1, 2],
         "item_id": ["1", "2", "1"],
         "clicks": [1, 2, 3],
     })
@@ -267,6 +274,7 @@ class DataValidationTests(parameterized.TestCase):
           bad_historical_data,
           item_id_column="item_id",
           date_column="date",
+          date_id_column="date_id",
           primary_metric_column="clicks",
       )
 
@@ -275,6 +283,7 @@ class DataValidationTests(parameterized.TestCase):
         "date": pd.to_datetime(
             ["2023-10-01", "2023-10-01", "2023-10-02", "2023-10-02"]
         ),
+        "date_id": [1, 1, 2, 2],
         "item_id": ["1", "2", "1", "2"],
         "clicks": [1, 2, 3, None],
     })
@@ -284,6 +293,7 @@ class DataValidationTests(parameterized.TestCase):
           bad_historical_data,
           item_id_column="item_id",
           date_column="date",
+          date_id_column="date_id",
           primary_metric_column="clicks",
       )
 
@@ -292,6 +302,7 @@ class DataValidationTests(parameterized.TestCase):
         "date": pd.to_datetime(
             ["2023-10-01", "2023-10-01", "2023-10-03", "2023-10-03"]
         ),
+        "date_id": [1, 1, 2, 2],
         "item_id": ["1", "2", "1", "2"],
         "clicks": [1, 2, 3, 4],
     })
@@ -301,6 +312,7 @@ class DataValidationTests(parameterized.TestCase):
           bad_historical_data,
           item_id_column="item_id",
           date_column="date",
+          date_id_column="date_id",
           primary_metric_column="clicks",
       )
 
@@ -309,6 +321,7 @@ class DataValidationTests(parameterized.TestCase):
         "date": pd.to_datetime(
             ["2023-10-01", "2023-10-01", "2023-10-02", "2023-10-02"]
         ),
+        "date_id": [1, 1, 2, 2],
         "item_id": ["1", "2", "1", "2"],
         "clicks": [1, 2, 3, np.inf],
     })
@@ -318,6 +331,7 @@ class DataValidationTests(parameterized.TestCase):
           bad_historical_data,
           item_id_column="item_id",
           date_column="date",
+          date_id_column="date_id",
           primary_metric_column="clicks",
       )
 
@@ -326,6 +340,7 @@ class DataValidationTests(parameterized.TestCase):
         "date": pd.to_datetime(
             ["2023-10-01", "2023-10-01", "2023-10-02", "2023-10-02"]
         ),
+        "date_id": [1, 1, 2, 2],
         "item_id": ["1", "2", "1", "2"],
         "clicks": [1, 2, 3, -1],
     })
@@ -335,6 +350,7 @@ class DataValidationTests(parameterized.TestCase):
           bad_historical_data,
           item_id_column="item_id",
           date_column="date",
+          date_id_column="date_id",
           primary_metric_column="clicks",
       )
 
@@ -345,6 +361,7 @@ class DataValidationTests(parameterized.TestCase):
         "date": pd.to_datetime(
             ["2023-10-01", "2023-10-01", "2023-10-02", "2023-10-02"]
         ),
+        "date_id": [1, 1, 2, 2],
         "item_id": ["1", "2", "1", "2"],
         "clicks": [1, 2, 3, -1],
     })
@@ -353,9 +370,53 @@ class DataValidationTests(parameterized.TestCase):
         good_historical_data,
         item_id_column="item_id",
         date_column="date",
+        date_id_column="date_id",
         primary_metric_column="clicks",
         require_positive_primary_metric=False,
     )
+
+  def test_historical_data_date_id_must_be_consecutive(
+      self,
+  ):
+    good_historical_data = pd.DataFrame({
+        "date": pd.to_datetime(
+            ["2023-10-01", "2023-10-01", "2023-10-02", "2023-10-02"]
+        ),
+        "date_id": [1, 1, 3, 3],
+        "item_id": ["1", "2", "1", "2"],
+        "clicks": [1, 2, 3, -1],
+    })
+    with self.assertRaises(ValueError):
+      data_preparation.validate_historical_data(
+          good_historical_data,
+          item_id_column="item_id",
+          date_column="date",
+          date_id_column="date_id",
+          primary_metric_column="clicks",
+          require_positive_primary_metric=False,
+      )
+
+  def test_historical_data_date_id_must_be_an_integer(
+      self,
+  ):
+    good_historical_data = pd.DataFrame({
+        "date": pd.to_datetime(
+            ["2023-10-01", "2023-10-01", "2023-10-02", "2023-10-02"]
+        ),
+        "date_id": ["1", "1", "2", "2"],
+        "item_id": ["1", "2", "1", "2"],
+        "clicks": [1, 2, 3, -1],
+    })
+
+    with self.assertRaises(ValueError):
+      data_preparation.validate_historical_data(
+          good_historical_data,
+          item_id_column="item_id",
+          date_column="date",
+          date_id_column="date_id",
+          primary_metric_column="clicks",
+          require_positive_primary_metric=False,
+      )
 
 
 if __name__ == "__main__":

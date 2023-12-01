@@ -448,6 +448,25 @@ def _validate_dates_are_either_daily_or_weekly(
     )
 
 
+def _validate_date_ids_are_consecutive_integers(
+    data: pd.DataFrame, date_id_column: str
+) -> None:
+  """Validates that the date_id is an array on consecutive integers."""
+  if not pd.api.types.is_integer_dtype(data[date_id_column]):
+    raise ValueError(
+        f"Date_id column must be an integer, got {data[date_id_column].dtype}."
+    )
+
+  unique_date_ids = data[date_id_column].drop_duplicates().sort_values()
+  gap_between_date_ids = (
+      (unique_date_ids - unique_date_ids.shift(1)).iloc[1:].values
+  )
+  if not np.all(gap_between_date_ids == 1):
+    raise ValueError("Date ids are not consecituve, there is a gap.")
+
+  print("Date ids are consecutive integers, check passed.")
+
+
 def _validate_all_metrics_are_finite(
     data: pd.DataFrame, metric_columns: Collection[str]
 ) -> None:
@@ -498,6 +517,7 @@ def validate_historical_data(
     historical_data: pd.DataFrame,
     item_id_column: str,
     date_column: str,
+    date_id_column: str,
     primary_metric_column: str,
     require_positive_primary_metric: bool = True,
 ) -> None:
@@ -512,6 +532,7 @@ def validate_historical_data(
   - The dates are either daily or weekly.
   - All primary metric is finite. This is stricter than non-null as it ensures
     they are numeric and not infinite.
+  - The date_id must be integers and consecutive.
 
   If require_positive_primary_metric is true, it also validates that the primary
   metric is always positive or 0.
@@ -521,6 +542,7 @@ def validate_historical_data(
     item_id_column: The column in the data contining the item identifier.
     date_column: The column in the data containing the date. This column must
       have a datetime type.
+    date_id_column: The column containing an integer identifier for the dates.
     primary_metric_column: The column containing the primary metric.
     require_positive_primary_metric: Require that the primary metric is always
       positive or 0. If set to False, it will check but not raise an exception
@@ -539,6 +561,7 @@ def validate_historical_data(
   _validate_dates_are_either_daily_or_weekly(
       historical_data, date_column=date_column
   )
+  _validate_date_ids_are_consecutive_integers(historical_data, date_id_column)
   _validate_all_metrics_are_finite(
       historical_data, metric_columns=[primary_metric_column]
   )
