@@ -47,6 +47,8 @@ class ExperimentDesign:
       primary metric in the test runtime period to trim in the analysis.
     alpha: The target false positive rate of the experiment. Defaults to 0.05.
     power: The target power for the experiment. Defaults to 0.8.
+    coinflip_salt: The salt used to randomise items into control and treatment.
+      None if randomisation has not been done.
   """
   n_items_before_trimming: int
   runtime_weeks: int
@@ -60,6 +62,7 @@ class ExperimentDesign:
   crossover_washout_weeks: int | None = None
   alpha: float = 0.05
   power: float = 0.8
+  coinflip_salt: str | None = None
 
   n_items_after_pre_trim: int = dataclasses.field(init=False)
   n_items_after_post_trim: int = dataclasses.field(init=False)

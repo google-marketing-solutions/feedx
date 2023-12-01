@@ -1072,6 +1072,7 @@ class SimulationAnalysis:
 
     summary_dict = dataclasses.asdict(self.design)
     summary_dict["design_id"] = self.design.design_id
+    del(summary_dict["coinflip_salt"])  # Not relevant for the summary
 
     summary_metrics = [
         "minimum_detectable_effect",

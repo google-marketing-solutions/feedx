@@ -29,6 +29,23 @@ ExperimentDesign = experiment_design.ExperimentDesign
 
 class ExperimentDesignTest(parameterized.TestCase):
 
+  def test_coinflip_salt_is_none_after_instance_creation(self):
+    design = ExperimentDesign(
+        n_items_before_trimming=1000,
+        runtime_weeks=6,
+        primary_metric="clicks",
+        pretest_weeks=4,
+        is_crossover=True,
+        pre_trim_top_percentile=0.1,
+        pre_trim_bottom_percentile=0.3,
+        post_trim_percentile=0.2,
+        crossover_washout_weeks=2,
+        alpha=0.05,
+        power=0.8,
+    )
+
+    self.assertIsNone(design.coinflip_salt)
+
   def test_design_calculates_n_items_after_pre_trim_correctly(self):
     design = ExperimentDesign(
         n_items_before_trimming=1000,
@@ -220,6 +237,7 @@ class ExperimentDesignTest(parameterized.TestCase):
 
     expected_yaml = textwrap.dedent("""\
         alpha: 0.05
+        coinflip_salt: null
         crossover_washout_weeks: 2
         is_crossover: true
         n_items_after_post_trim: 360
@@ -262,6 +280,7 @@ class ExperimentDesignTest(parameterized.TestCase):
     yaml_file = self.create_tempfile()
     yaml_file.write_text(textwrap.dedent("""\
         alpha: 0.05
+        coinflip_salt: null
         crossover_washout_weeks: 2
         is_crossover: true
         n_items_after_post_trim: 200
@@ -285,6 +304,7 @@ class ExperimentDesignTest(parameterized.TestCase):
     yaml_file = self.create_tempfile()
     yaml_file.write_text(textwrap.dedent("""\
         alpha: 0.05
+        coinflip_salt: null
         crossover_washout_weeks: 2
         is_crossover: true
         n_items_after_post_trim: 360
