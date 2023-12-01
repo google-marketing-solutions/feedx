@@ -308,27 +308,64 @@ class CoinflipTests(parameterized.TestCase):
   def test_coinflip_is_always_0_or_1(self):
     item_ids = [f"Product_{i}" for i in range(100)]
 
-    coinflip = experiment_design.Coinflip(seed=123)
+    coinflip = experiment_design.Coinflip(salt="abc")
     coinflip_unique_output = set(map(coinflip, item_ids))
 
     self.assertEqual(coinflip_unique_output, {0, 1})
 
-  def test_coinflip_is_deterministic_for_item_id_with_same_seed(self):
+  def test_coinflip_is_deterministic_for_item_id_with_same_salt(self):
     item_ids = ["Product_1"] * 100
 
-    coinflip = experiment_design.Coinflip(seed=123)
+    coinflip = experiment_design.Coinflip(salt="abc")
     coinflip_unique_output = set(map(coinflip, item_ids))
 
     self.assertLen(coinflip_unique_output, 1)
 
-  def test_coinflip_is_different_for_different_seeds(self):
+  def test_different_coinflip_instances_produces_same_output_if_salt_is_same(
+      self,
+  ):
+    coinflip_1 = experiment_design.Coinflip(salt="abc")
+    coinflip_2 = experiment_design.Coinflip(salt="abc")
+    item_ids = [f"Product_{i}" for i in range(100)]
+
+    coinflip_1_outputs = list(map(coinflip_1, item_ids))
+    coinflip_2_outputs = list(map(coinflip_2, item_ids))
+
+    self.assertListEqual(coinflip_1_outputs, coinflip_2_outputs)
+
+  def test_coinflip_is_different_for_different_salts(self):
     item_id = "Product_1"
 
     coinflip_unique_output = set(
-        [experiment_design.Coinflip(seed=seed)(item_id) for seed in range(100)]
+        [
+            experiment_design.Coinflip(salt=str(salt))(item_id)
+            for salt in range(100)
+        ]
     )
 
     self.assertLen(coinflip_unique_output, 2)
+
+  def test_coinfip_with_random_salt_generates_a_random_salt(self):
+    coinflip_1 = experiment_design.Coinflip.with_random_salt()
+    coinflip_2 = experiment_design.Coinflip.with_random_salt()
+
+    self.assertNotEqual(coinflip_1.salt, coinflip_2.salt)
+
+  def test_coinfip_with_random_salt_produces_different_treatment_assignments(
+      self,
+  ):
+    coinflip_1 = experiment_design.Coinflip.with_random_salt()
+    coinflip_2 = experiment_design.Coinflip.with_random_salt()
+    item_ids = [f"Product_{i}" for i in range(100)]
+
+    coinflip_1_outputs = list(map(coinflip_1, item_ids))
+    coinflip_2_outputs = list(map(coinflip_2, item_ids))
+
+    self.assertNotEqual(coinflip_1_outputs, coinflip_2_outputs)
+
+  def test_salt_cannot_be_empty_string(self):
+    with self.assertRaises(ValueError):
+      experiment_design.Coinflip(salt="")
 
 
 class TrimOutliersTest(parameterized.TestCase):

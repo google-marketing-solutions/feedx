@@ -197,22 +197,39 @@ class ExperimentDesign:
 
 
 class Coinflip:
-  """Coinflip to assign products to control or treatment groups.
+  """Coinflip to assign items to control or treatment groups.
 
   This coinflip is psuedo-random but deterministic, meaning that given the same
-  item_id and seed it will always return the same treatment assignment.
+  item_id and salt it will always return the same treatment assignment.
+
+  It assigns the items with a 50/50 chance of being in treatment or control.
+
+  When the coinflip is called, it prepends the salt to the argument it is called
+  on, and then hashes the result, creating a psuedo-random number.
+
+  Attributes:
+    salt: The salt used for the hash function.
   """
 
-  def __init__(self, seed: int, salt_length: int = 10):
-    """Instantiates the coinflip function with the seed provided.
+  def __init__(self, salt: str):
+    """Instantiates the coinflip function with the salt provided.
 
     Args:
-      seed: seed for the random number generator
-      salt_length: length of the randomly generated string to use as a salt for
-        the hash
+      salt: The salt to use for the hash.
+
+    Raises:
+      ValueError: If the salt is an empty string.
     """
-    rng = np.random.default_rng(seed)
-    self.salt = str(rng.bytes(salt_length).hex())
+    if not salt:
+      raise ValueError("Salt must not be empty.")
+
+    self.salt = salt
+
+  @classmethod
+  def with_random_salt(cls, salt_length: int = 10) -> "Coinflip":
+    rng = np.random.default_rng()
+    salt = str(rng.bytes(salt_length).hex())
+    return cls(salt)
 
   def __call__(self, item_id: str) -> int:
     """Assigns each sample to either the control or treatment group.
