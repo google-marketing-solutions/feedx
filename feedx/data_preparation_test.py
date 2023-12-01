@@ -215,6 +215,7 @@ class DataValidationTests(parameterized.TestCase):
         historical_data,
         item_id_column="item_id",
         date_column="date",
+        primary_metric_column="clicks",
     )
 
   def test_validate_historical_data_passes_for_good_weekly_data(self):
@@ -230,6 +231,7 @@ class DataValidationTests(parameterized.TestCase):
         historical_data,
         item_id_column="item_id",
         date_column="date",
+        primary_metric_column="clicks",
     )
 
   def test_historical_data_must_have_unique_item_id_and_dates(self):
@@ -250,6 +252,7 @@ class DataValidationTests(parameterized.TestCase):
           bad_historical_data,
           item_id_column="item_id",
           date_column="date",
+          primary_metric_column="clicks",
       )
 
   def test_historical_data_must_have_every_item_and_date_combination(self):
@@ -264,6 +267,7 @@ class DataValidationTests(parameterized.TestCase):
           bad_historical_data,
           item_id_column="item_id",
           date_column="date",
+          primary_metric_column="clicks",
       )
 
   def test_historical_data_must_have_no_nulls(self):
@@ -280,6 +284,7 @@ class DataValidationTests(parameterized.TestCase):
           bad_historical_data,
           item_id_column="item_id",
           date_column="date",
+          primary_metric_column="clicks",
       )
 
   def test_historical_data_must_be_either_daily_or_weekly_spaced(self):
@@ -296,6 +301,24 @@ class DataValidationTests(parameterized.TestCase):
           bad_historical_data,
           item_id_column="item_id",
           date_column="date",
+          primary_metric_column="clicks",
+      )
+
+  def test_historical_data_primary_metric_must_be_finite(self):
+    bad_historical_data = pd.DataFrame({
+        "date": pd.to_datetime(
+            ["2023-10-01", "2023-10-01", "2023-10-02", "2023-10-02"]
+        ),
+        "item_id": ["1", "2", "1", "2"],
+        "clicks": [1, 2, 3, np.inf],
+    })
+
+    with self.assertRaises(ValueError):
+      data_preparation.validate_historical_data(
+          bad_historical_data,
+          item_id_column="item_id",
+          date_column="date",
+          primary_metric_column="clicks",
       )
 
 

@@ -18,6 +18,7 @@ This module contains functions for loading and preparing the data required for
 FeedX.
 """
 
+from collections.abc import Collection
 import datetime as dt
 from typing import Callable
 import numpy as np
@@ -447,10 +448,30 @@ def _validate_dates_are_either_daily_or_weekly(
     )
 
 
+def _validate_all_metrics_are_finite(
+    data: pd.DataFrame, metric_columns: Collection[str]
+) -> None:
+  """Validates that all the metrics are finite."""
+  for metric_column in metric_columns:
+    invalid_metric_count = (~np.isfinite(data[metric_column].values)).sum()
+
+    if invalid_metric_count:
+      raise ValueError(
+          f"There are {invalid_metric_count} non-finite values in"
+          f" {metric_column}. "
+      )
+
+  print(
+      f"The following metric values are all finite: {metric_columns}, check"
+      " passed."
+  )
+
+
 def validate_historical_data(
     historical_data: pd.DataFrame,
     item_id_column: str,
     date_column: str,
+    primary_metric_column: str,
 ) -> None:
   """Runs all the required validation for the historical data.
 
@@ -461,12 +482,15 @@ def validate_historical_data(
   - All items have exactly 1 row for every date, there are no missing
     date / item combinations or duplicates.
   - The dates are either daily or weekly.
+  - All primary metric is finite. This is stricter than non-null as it ensures
+    they are numeric and not infinite.
 
   Args:
     historical_data: The historical data to be validated.
     item_id_column: The column in the data contining the item identifier.
     date_column: The column in the data containing the date. This column must
       have a datetime type.
+    primary_metric_column: The column containing the primary metric.
 
   Raises:
     ValueError: If any of the validations fail.
@@ -480,4 +504,7 @@ def validate_historical_data(
   )
   _validate_dates_are_either_daily_or_weekly(
       historical_data, date_column=date_column
+  )
+  _validate_all_metrics_are_finite(
+      historical_data, metric_columns=[primary_metric_column]
   )
