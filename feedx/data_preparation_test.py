@@ -202,9 +202,26 @@ class DownsampleItemsTests(parameterized.TestCase):
 
 class DataValidationTests(parameterized.TestCase):
 
-  def test_validate_historical_data_passes_for_good_data(self):
+  def test_validate_historical_data_passes_for_good_daily_data(self):
     historical_data = pd.DataFrame({
-        "date": ["2023-10-01", "2023-10-01", "2023-10-02", "2023-10-02"],
+        "date": pd.to_datetime(
+            ["2023-10-01", "2023-10-01", "2023-10-02", "2023-10-02"]
+        ),
+        "item_id": ["1", "2", "1", "2"],
+        "clicks": [1, 2, 3, 4],
+    })
+
+    data_preparation.validate_historical_data(
+        historical_data,
+        item_id_column="item_id",
+        date_column="date",
+    )
+
+  def test_validate_historical_data_passes_for_good_weekly_data(self):
+    historical_data = pd.DataFrame({
+        "date": pd.to_datetime(
+            ["2023-10-01", "2023-10-01", "2023-10-08", "2023-10-08"]
+        ),
         "item_id": ["1", "2", "1", "2"],
         "clicks": [1, 2, 3, 4],
     })
@@ -217,13 +234,13 @@ class DataValidationTests(parameterized.TestCase):
 
   def test_historical_data_must_have_unique_item_id_and_dates(self):
     bad_historical_data = pd.DataFrame({
-        "date": [
+        "date": pd.to_datetime([
             "2023-10-01",
             "2023-10-01",
             "2023-10-02",
             "2023-10-02",
             "2023-10-02",
-        ],
+        ]),
         "item_id": ["1", "2", "1", "2", "2"],
         "clicks": [1, 2, 3, 4, 5],
     })
@@ -237,7 +254,7 @@ class DataValidationTests(parameterized.TestCase):
 
   def test_historical_data_must_have_every_item_and_date_combination(self):
     bad_historical_data = pd.DataFrame({
-        "date": ["2023-10-01", "2023-10-01", "2023-10-02"],
+        "date": pd.to_datetime(["2023-10-01", "2023-10-01", "2023-10-02"]),
         "item_id": ["1", "2", "1"],
         "clicks": [1, 2, 3],
     })
@@ -251,9 +268,27 @@ class DataValidationTests(parameterized.TestCase):
 
   def test_historical_data_must_have_no_nulls(self):
     bad_historical_data = pd.DataFrame({
-        "date": ["2023-10-01", "2023-10-01", "2023-10-02", "2023-10-02"],
+        "date": pd.to_datetime(
+            ["2023-10-01", "2023-10-01", "2023-10-02", "2023-10-02"]
+        ),
         "item_id": ["1", "2", "1", "2"],
         "clicks": [1, 2, 3, None],
+    })
+
+    with self.assertRaises(ValueError):
+      data_preparation.validate_historical_data(
+          bad_historical_data,
+          item_id_column="item_id",
+          date_column="date",
+      )
+
+  def test_historical_data_must_be_either_daily_or_weekly_spaced(self):
+    bad_historical_data = pd.DataFrame({
+        "date": pd.to_datetime(
+            ["2023-10-01", "2023-10-01", "2023-10-03", "2023-10-03"]
+        ),
+        "item_id": ["1", "2", "1", "2"],
+        "clicks": [1, 2, 3, 4],
     })
 
     with self.assertRaises(ValueError):

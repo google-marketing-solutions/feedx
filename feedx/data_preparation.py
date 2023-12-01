@@ -422,6 +422,31 @@ def _validate_no_null_values(data: pd.DataFrame) -> None:
   print("No nulls check passed.")
 
 
+def _validate_dates_are_either_daily_or_weekly(
+    data: pd.DataFrame, date_column: str
+) -> None:
+  """Validates that the dates are either daily or weekly spaced."""
+  if not pd.api.types.is_datetime64_any_dtype(data[date_column]):
+    raise ValueError(
+        f"Date column must be datetime type, got {data[date_column].dtype}."
+    )
+
+  unique_dates = data[date_column].drop_duplicates().sort_values()
+  days_between_dates = (
+      (unique_dates - unique_dates.shift(1)).iloc[1:].dt.days.values
+  )
+
+  if np.all(days_between_dates == 7):
+    print("Dates are weekly, check passed.")
+  elif np.all(days_between_dates == 1):
+    print("Dates are daily, check passed.")
+  else:
+    raise ValueError(
+        "Dates and neither consistently weekly spaced or consistently daily"
+        " spaced, check failed."
+    )
+
+
 def validate_historical_data(
     historical_data: pd.DataFrame,
     item_id_column: str,
@@ -435,11 +460,13 @@ def validate_historical_data(
   - There are no null or n/a values in the data.
   - All items have exactly 1 row for every date, there are no missing
     date / item combinations or duplicates.
+  - The dates are either daily or weekly.
 
   Args:
     historical_data: The historical data to be validated.
     item_id_column: The column in the data contining the item identifier.
-    date_column: The column in the data containing the date.
+    date_column: The column in the data containing the date. This column must
+      have a datetime type.
 
   Raises:
     ValueError: If any of the validations fail.
@@ -450,4 +477,7 @@ def validate_historical_data(
       historical_data,
       group_column=date_column,
       value_column=item_id_column,
+  )
+  _validate_dates_are_either_daily_or_weekly(
+      historical_data, date_column=date_column
   )
