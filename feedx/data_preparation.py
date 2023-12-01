@@ -409,6 +409,19 @@ def _validate_every_value_exists_exactly_once_for_every_group(
     )
 
 
+def _validate_no_null_values(data: pd.DataFrame) -> None:
+  """Validates that there are no null or n/a values in the data."""
+  nulls = data.isnull().sum()
+  if np.any(nulls.values > 0):
+    raise ValueError(f"Nulls found in data:\n{nulls}")
+
+  nas = data.isna().sum()
+  if np.any(nas.values > 0):
+    raise ValueError(f"N/As found in data:\n{nas}")
+
+  print("No nulls check passed.")
+
+
 def validate_historical_data(
     historical_data: pd.DataFrame,
     item_id_column: str,
@@ -419,6 +432,7 @@ def validate_historical_data(
   The historical data is used to perform simulations to design the optimal
   experiment. This validates that:
 
+  - There are no null or n/a values in the data.
   - All items have exactly 1 row for every date, there are no missing
     date / item combinations or duplicates.
 
@@ -431,6 +445,7 @@ def validate_historical_data(
     ValueError: If any of the validations fail.
   """
 
+  _validate_no_null_values(historical_data)
   _validate_every_value_exists_exactly_once_for_every_group(
       historical_data,
       group_column=date_column,

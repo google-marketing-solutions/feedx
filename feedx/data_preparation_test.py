@@ -206,6 +206,7 @@ class DataValidationTests(parameterized.TestCase):
     historical_data = pd.DataFrame({
         "date": ["2023-10-01", "2023-10-01", "2023-10-02", "2023-10-02"],
         "item_id": ["1", "2", "1", "2"],
+        "clicks": [1, 2, 3, 4],
     })
 
     data_preparation.validate_historical_data(
@@ -224,6 +225,7 @@ class DataValidationTests(parameterized.TestCase):
             "2023-10-02",
         ],
         "item_id": ["1", "2", "1", "2", "2"],
+        "clicks": [1, 2, 3, 4, 5],
     })
 
     with self.assertRaises(ValueError):
@@ -237,6 +239,21 @@ class DataValidationTests(parameterized.TestCase):
     bad_historical_data = pd.DataFrame({
         "date": ["2023-10-01", "2023-10-01", "2023-10-02"],
         "item_id": ["1", "2", "1"],
+        "clicks": [1, 2, 3],
+    })
+
+    with self.assertRaises(ValueError):
+      data_preparation.validate_historical_data(
+          bad_historical_data,
+          item_id_column="item_id",
+          date_column="date",
+      )
+
+  def test_historical_data_must_have_no_nulls(self):
+    bad_historical_data = pd.DataFrame({
+        "date": ["2023-10-01", "2023-10-01", "2023-10-02", "2023-10-02"],
+        "item_id": ["1", "2", "1", "2"],
+        "clicks": [1, 2, 3, None],
     })
 
     with self.assertRaises(ValueError):
