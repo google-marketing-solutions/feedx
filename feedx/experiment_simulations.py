@@ -389,9 +389,9 @@ class SimulationAnalysis:
       hypothesis that the simulated false positive rate of this experiment is
       not more than the target design.alpha. A statistically significant p-value
       indicates an invalid experiment. None if the validation has not been run.
-    power_at_minimum_detectable_effect: The actual simulated power for the
-      minimum detectable effect, should be close to design.power. None if the
-      validation has not been run.
+    simulated_power_at_minimum_detectable_effect: The actual simulated power for
+      the minimum detectable effect, should be close to design.power. None if
+      the validation has not been run.
     simulated_false_positive_rate: The actual simulated false positive rate,
       should be close to design.alpha. None if the validation has not been run.
     aa_simulation_results: The full A/A simulation results. None if the
@@ -424,9 +424,6 @@ class SimulationAnalysis:
   )
 
   ab_robustness_pvalue: float | None = dataclasses.field(
-      default=None, init=False
-  )
-  power_at_minimum_detectable_effect: float | None = dataclasses.field(
       default=None, init=False
   )
 
@@ -867,3 +864,29 @@ class SimulationAnalysis:
         p=self.design.alpha,
         alternative="greater",
     ).pvalue
+
+  @property
+  def _ab_is_statistically_significant(self) -> np.ndarray | None:
+    if self.aa_simulation_results is None:
+      return None
+
+    return (
+        self.ab_simulation_results["p_value"].values < self.design.alpha
+    ).astype(int)
+
+  @property
+  def simulated_power_at_minimum_detectable_effect(self) -> float | None:
+    """Returns the power where the true effect is the minimum detectable effect.
+
+    In A/B tests we simulated a true effect of the size of the minimum
+    detectable effect, so a significant result is a true positive. The fraction
+    of the simulations with a statistically significant result is the true
+    positive rate, also known as the power. This should be close to
+    design.power.
+
+    If the validate_design() method has not yet been run, this returns None.
+    """
+    if self.aa_simulation_results is None:
+      return None
+
+    return np.mean(self._ab_is_statistically_significant)
