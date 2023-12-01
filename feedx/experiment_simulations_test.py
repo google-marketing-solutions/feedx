@@ -434,7 +434,7 @@ class SimulationAnalysisTests(parameterized.TestCase):
             results.aa_simulation_results,
             results.ab_simulation_results,
             results.null_p_value_robustness_p_value,
-            results.ab_robustness_pvalue,
+            results.power_robustness_p_value,
             results.simulated_power_at_minimum_detectable_effect,
             results.simulated_false_positive_rate,
             results.false_positive_rate_robustness_p_value,
@@ -1055,6 +1055,38 @@ class SimulationAnalysisTests(parameterized.TestCase):
     self.assertAlmostEqual(
         results.simulated_power_at_minimum_detectable_effect, 0.6
     )
+
+  def test_power_robustness_p_value_returns_expected_value(
+      self,
+  ):
+    design = ExperimentDesign(
+        n_items_before_trimming=60,
+        is_crossover=False,
+        runtime_weeks=6,
+        pretest_weeks=0,
+        pre_trim_top_percentile=0.0,
+        pre_trim_bottom_percentile=0.0,
+        post_trim_percentile=0.0,
+        primary_metric="clicks",
+    )
+
+    results = experiment_simulations.SimulationAnalysis(
+        design=design,
+        historical_data=self.big_historical_data,
+        minimum_start_week_id=0,
+        week_id_column="week_id",
+        item_id_column="item_id",
+        rng=np.random.default_rng(0),
+    )
+    results.estimate_minimum_detectable_effect()
+    results.validate_design(n_simulations=5)
+
+    # Override the relevant column to isolate this test
+    results.ab_simulation_results["p_value"] = np.array(
+        [0.01, 0.01, 0.01, 0.3, 0.8]
+    )
+
+    self.assertAlmostEqual(results.power_robustness_p_value, 0.26272)
 
 
 if __name__ == "__main__":

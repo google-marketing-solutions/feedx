@@ -379,8 +379,6 @@ class SimulationAnalysis:
       estimate_minimum_detectable_effect has not been run.
     primary_metric_standard_deviation: The standard deviation of the primary
       metric. None if estimate_minimum_detectable_effect has not been run.
-    ab_robustness_pvalue: A p-value testing the null hypothesis that the A/B
-      simulation results are valid. None if the validation has not been run.
     null_p_value_robustness_p_value: A p-value testing the null hypothesis that
       the A/A simulation p-values follow a uniform distribution. A statistically
       significant p-value indicates an invalid experiment. None if the
@@ -389,6 +387,10 @@ class SimulationAnalysis:
       hypothesis that the simulated false positive rate of this experiment is
       not more than the target design.alpha. A statistically significant p-value
       indicates an invalid experiment. None if the validation has not been run.
+    power_robustness_p_value: A p-value testing the null hypothesis that the
+      simulated power is at least the target power. A statistically significant
+      p-value indicates an invalid experiment. None if the validation has not
+      been run.
     simulated_power_at_minimum_detectable_effect: The actual simulated power for
       the minimum detectable effect, should be close to design.power. None if
       the validation has not been run.
@@ -420,10 +422,6 @@ class SimulationAnalysis:
       default=None, init=False
   )
   primary_metric_standard_deviation: float | None = dataclasses.field(
-      default=None, init=False
-  )
-
-  ab_robustness_pvalue: float | None = dataclasses.field(
       default=None, init=False
   )
 
@@ -890,3 +888,24 @@ class SimulationAnalysis:
       return None
 
     return np.mean(self._ab_is_statistically_significant)
+
+  @property
+  def power_robustness_p_value(self) -> float | None:
+    """Returns a p-value testing that the simulated power is valid.
+
+    In A/B tests we simulated a true effect of the size of the minimum
+    detectable effect. We want to ensure that at the minimum detectable effect
+    we can measure a statistically significant result at least design.power
+    percent of the time.
+
+    If the validate_design() method has not yet been run, this returns None.
+    """
+    if self.aa_simulation_results is None:
+      return None
+
+    return stats.binomtest(
+        k=np.sum(self._ab_is_statistically_significant),
+        n=len(self._ab_is_statistically_significant),
+        p=self.design.power,
+        alternative="less",
+    ).pvalue
