@@ -18,8 +18,10 @@ from collections.abc import Collection
 import dataclasses
 import itertools
 
+import matplotlib as mpl
 import numpy as np
 import pandas as pd
+from pandas.io.formats import style
 from scipy import stats
 import tqdm.autonotebook as tqdm
 
@@ -1111,3 +1113,140 @@ def make_analysis_summary_dataframe(
       .set_index("design_id")
       .sort_values(sort_by)
   )
+
+
+def _format_check_column(value: bool | None) -> str:
+  if value is None:
+    return ""
+  return (
+      "background-color:lightgreen"
+      if value
+      else "background-color:darkred;color:white"
+  )
+
+
+def _drop_validation_columns(summary_data: pd.DataFrame) -> pd.DataFrame:
+  validation_columns = [
+      column
+      for column in summary_data.columns
+      if column.endswith("_pass") | column.startswith("simulated_")
+  ]
+  return summary_data.drop(columns=validation_columns)
+
+
+def _extract_constant_design_columns_for_caption(
+    summary_data: pd.DataFrame,
+) -> tuple[pd.DataFrame, str]:
+  """Removes any constant design columns and adds them to a caption.
+
+  Any design columns that are the same for every row in the summary data are
+  dropped from the dataframe, and added to a string that can be used as the
+  dataframe caption.
+
+  Args:
+    summary_data: The data to extract constant columns from.
+
+  Returns:
+    The data with the constant columns dropped, and a string containing a
+    summary of the constant columns.
+  """
+  design_attributes = [
+      "primary_metric",
+      "alpha",
+      "power",
+      "n_items_before_trimming",
+      "n_items_after_pre_trim",
+      "n_items_after_post_trim",
+      "runtime_weeks",
+      "pretest_weeks",
+      "pre_trim_top_percentile",
+      "pre_trim_bottom_percentile",
+      "post_trim_percentile",
+      "is_crossover",
+  ]
+  constant_design_attributes = []
+  constant_attributes_summaries = []
+  for column in design_attributes:
+    if summary_data[column].nunique(dropna=False) == 1:
+      constant_design_attributes.append(column)
+      constant_attributes_summaries.append(
+          f"{column} = {summary_data.iloc[0][column]}"
+      )
+
+  summary_data = summary_data.drop(columns=constant_design_attributes)
+  constant_attributes_summary = ", ".join(constant_attributes_summaries)
+
+  return summary_data, constant_attributes_summary
+
+
+def _clean_column_names(summary_data: pd.DataFrame) -> pd.DataFrame:
+  summary_data.columns = [
+      column.replace("_", " ").title() for column in summary_data.columns
+  ]
+  return summary_data
+
+
+def format_analysis_summary_dataframe(
+    summary_data: pd.DataFrame, with_validation_columns: bool = True
+) -> style.Styler:
+  """Formats the summary dataframe for nice displaying in jupyter notebooks.
+
+  Args:
+    summary_data: The data to be displayed, should have been generated with
+      make_analysis_summary_dataframe().
+    with_validation_columns: Whether to display the validation columns. Defaults
+      to True.
+
+  Returns:
+    The styled dataframe.
+  """
+  summary_data = summary_data.copy()
+
+  if not with_validation_columns:
+    summary_data = _drop_validation_columns(summary_data)
+
+  summary_data, constant_attributes_summary = (
+      _extract_constant_design_columns_for_caption(summary_data)
+  )
+  caption = (
+      "Analysis results of experiment designs where the following design"
+      f" attributes are constant for all designs: {constant_attributes_summary}"
+  )
+
+  summary_data = _clean_column_names(summary_data)
+
+  def _get_existing_summary_columns(columns: Collection[str]) -> list[str]:
+    return list(filter(lambda x: x in summary_data.columns.values, columns))
+
+  styled_summary_data = (
+      summary_data.style.set_caption(caption)
+      .bar(
+          subset=_get_existing_summary_columns([
+              "Minimum Detectable Effect",
+              "Relative Minimum Detectable Effect",
+          ]),
+          cmap=mpl.colormaps["RdYlGn_r"],
+      )
+      .format(
+          "{:.2%}",
+          subset=_get_existing_summary_columns([
+              "Relative Minimum Detectable Effect",
+              "Pre Trim Top Percentile",
+              "Pre Trim Bottom Percentile",
+              "Post Trim Percentile",
+              "Simulated False Positive Rate",
+              "Simulated Power At Minimum Detectable Effect",
+          ]),
+      )
+      .highlight_null(props="opacity:0%")
+      .applymap(
+          _format_check_column,
+          subset=[
+              column
+              for column in summary_data.columns
+              if column.endswith(" Pass")
+          ],
+      )
+  )
+
+  return styled_summary_data

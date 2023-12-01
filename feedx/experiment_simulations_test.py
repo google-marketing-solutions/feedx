@@ -20,6 +20,7 @@ from absl.testing import absltest
 from absl.testing import parameterized
 import numpy as np
 import pandas as pd
+from pandas.io.formats import style
 
 from feedx import experiment_simulations
 
@@ -1612,6 +1613,43 @@ class SummaryDataframeTests(parameterized.TestCase):
     pd.testing.assert_index_equal(
         summary_data.index, correctly_sorted_summary_data.index
     )
+
+  @parameterized.parameters(True, False)
+  def test_format_analysis_summary_dataframe_returns_dataframe_styler(
+      self, with_validation_columns
+  ):
+    design = ExperimentDesign(
+        n_items_before_trimming=60,
+        is_crossover=False,
+        runtime_weeks=6,
+        pretest_weeks=0,
+        pre_trim_top_percentile=0.0,
+        pre_trim_bottom_percentile=0.0,
+        post_trim_percentile=0.0,
+        primary_metric="clicks",
+    )
+
+    analysis = experiment_simulations.SimulationAnalysis(
+        design,
+        self.historical_data,
+        item_id_column="item_id",
+        week_id_column="week_id",
+        minimum_start_week_id=0,
+        rng=np.random.default_rng(0),
+    )
+    analysis.estimate_minimum_detectable_effect()
+    analysis.validate_design(n_simulations=5)
+
+    summary_data = experiment_simulations.make_analysis_summary_dataframe(
+        [analysis]
+    )
+
+    formatted_summary_data = (
+        experiment_simulations.format_analysis_summary_dataframe(
+            summary_data, with_validation_columns
+        )
+    )
+    self.assertIsInstance(formatted_summary_data, style.Styler)
 
 
 if __name__ == "__main__":
