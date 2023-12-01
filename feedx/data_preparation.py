@@ -308,3 +308,60 @@ def fill_missing_rows_with_zeros(
     )
 
   return output_data
+
+
+def downsample_items(
+    data: pd.DataFrame,
+    downsample_fraction: float,
+    item_id_column: str,
+    rng: np.random.RandomState,
+) -> pd.DataFrame:
+  """Downsamples the items in the data.
+
+  This will sample downsample_fraction of the items in the original data without
+  replacement. If downsample_fraction = 1, it will return the original data
+  unchanged.
+
+  Args:
+    data: The data to be downsampled.
+    downsample_fraction: The fraction of items to select from the data, must be
+      between 0 and 1. If 1, all items are returned.
+    item_id_column: The column in the data containing the item identifier.
+    rng: The random state used to ensure sampling is reproducable.
+
+  Returns:
+    Downsampled data.
+
+  Raises:
+    ValueError: If the downsample fraction is not in the range (0.0, 1.0], or
+      if the item_id_column is not in the data.
+  """
+  if (downsample_fraction <= 0.0) | (downsample_fraction > 1.0):
+    raise ValueError("Downsample_fraction must be in the range of (0.0, 1.0].")
+
+  if item_id_column not in data.columns:
+    raise ValueError(f"The column {item_id_column} does not exist in the data.")
+
+  print(
+      f"Data has {len(data.index.values)} rows and"
+      f" {data[item_id_column].nunique()} items."
+  )
+
+  if downsample_fraction == 1.0:
+    print("Not downsampling, since the downsample_fraction = 1.0")
+    return data
+
+  print(
+      f"Sampling {downsample_fraction:.2%} of the items in the original data."
+  )
+  sampled_items = (
+      data[item_id_column]
+      .drop_duplicates()
+      .sample(frac=downsample_fraction, random_state=rng)
+  )
+  data = data[data[item_id_column].isin(sampled_items)]
+  print(
+      f"Downsampled data has {len(data.index.values)} rows and"
+      f" {data[item_id_column].nunique()} items."
+  )
+  return data

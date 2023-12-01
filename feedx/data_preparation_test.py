@@ -16,6 +16,7 @@
 
 from absl.testing import absltest
 from absl.testing import parameterized
+import numpy as np
 import pandas as pd
 
 from feedx import data_preparation
@@ -120,6 +121,82 @@ class FillMissingRowsWithZerosTests(parameterized.TestCase):
     with self.assertRaises(ValueError):
       data_preparation.fill_missing_rows_with_zeros(
           self.input_data, item_id_column="item_id", date_column="date"
+      )
+
+
+class DownsampleItemsTests(parameterized.TestCase):
+
+  def setUp(self):
+    self.data = pd.DataFrame({
+        "item_id": ["1", "1", "2", "2", "3", "3", "4", "4"],
+        "clicks": [1, 2, 3, 4, 5, 6, 7, 8],
+    })
+    self.rng = np.random.default_rng(123)
+
+  def test_downsample_items_downsamples_if_downsample_fraction_less_than_1(
+      self,
+  ):
+    downsampled_data = data_preparation.downsample_items(
+        self.data,
+        downsample_fraction=0.5,
+        item_id_column="item_id",
+        rng=self.rng,
+    )
+    self.assertLess(
+        len(downsampled_data.index.values), len(self.data.index.values)
+    )
+
+  def test_downsample_items_keeps_all_original_rows_for_sampled_items(
+      self,
+  ):
+    downsampled_data = data_preparation.downsample_items(
+        self.data,
+        downsample_fraction=0.5,
+        item_id_column="item_id",
+        rng=self.rng,
+    )
+
+    original_data_for_sampled_items = self.data[
+        self.data["item_id"].isin(downsampled_data["item_id"])
+    ]
+
+    pd.testing.assert_frame_equal(
+        original_data_for_sampled_items, downsampled_data, check_like=True
+    )
+
+  def test_downsample_items_does_not_downsample_if_downsample_fraction_is_1(
+      self,
+  ):
+    downsampled_data = data_preparation.downsample_items(
+        self.data,
+        downsample_fraction=1.0,
+        item_id_column="item_id",
+        rng=self.rng,
+    )
+    pd.testing.assert_frame_equal(self.data, downsampled_data, check_like=True)
+
+  def test_downsample_items_raises_exception_if_item_id_column_is_missing(
+      self,
+  ):
+    self.data.drop("item_id", axis=1, inplace=True)
+    with self.assertRaises(ValueError):
+      data_preparation.downsample_items(
+          self.data,
+          downsample_fraction=0.5,
+          item_id_column="item_id",
+          rng=self.rng,
+      )
+
+  @parameterized.parameters(-0.1, 0.0, 1.1)
+  def test_downsample_items_raises_exception_for_bad_downsample_fraction(
+      self, bad_downsample_fraction
+  ):
+    with self.assertRaises(ValueError):
+      data_preparation.downsample_items(
+          self.data,
+          downsample_fraction=bad_downsample_fraction,
+          item_id_column="item_id",
+          rng=self.rng,
       )
 
 
