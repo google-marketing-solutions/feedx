@@ -391,6 +391,14 @@ class SimulationAnalysis:
       simulated power is at least the target power. A statistically significant
       p-value indicates an invalid experiment. None if the validation has not
       been run.
+    aa_point_estimate_robustness_p_value: A p-value testing the null hypothesis
+      that the point estimates of the A/A simulations are centered on 0.0. A
+      statistically significant p-value indicates an invalid experiment. None if
+      the validation has not been run.
+    ab_point_estimate_robustness_p_value: A p-value testing the null hypothesis
+      that the point estimates of the A/B simulations are centered on the
+      minimum detectable effect. A statistically significant p-value indicates
+      an invalid experiment. None if the validation has not been run.
     simulated_power_at_minimum_detectable_effect: The actual simulated power for
       the minimum detectable effect, should be close to design.power. None if
       the validation has not been run.
@@ -908,4 +916,39 @@ class SimulationAnalysis:
         n=len(self._ab_is_statistically_significant),
         p=self.design.power,
         alternative="less",
+    ).pvalue
+
+  @property
+  def aa_point_estimate_robustness_p_value(self) -> float | None:
+    """Returns a p-value testing that the A/A test point estimates are valid.
+
+    This is valid if the distribution of point estimates from the A/A tests
+    is centered on 0. This is tested with a 1 sample t-test.
+
+    If the validate_design() method has not yet been run, this returns None.
+    """
+    if self.aa_simulation_results is None:
+      return None
+
+    return stats.ttest_1samp(
+        self.aa_simulation_results["absolute_difference"].values,
+        0.0,
+    ).pvalue
+
+  @property
+  def ab_point_estimate_robustness_p_value(self) -> float | None:
+    """Returns a p-value testing that the A/B test point estimates are valid.
+
+    This is valid if the distribution of point estimates from the A/B tests
+    is centered on the minimum detectable effect. This is tested with a 1 sample
+    t-test.
+
+    If the validate_design() method has not yet been run, this returns None.
+    """
+    if self.aa_simulation_results is None:
+      return None
+
+    return stats.ttest_1samp(
+        self.ab_simulation_results["absolute_difference"].values,
+        self.minimum_detectable_effect,
     ).pvalue

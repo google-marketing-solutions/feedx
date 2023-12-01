@@ -438,8 +438,24 @@ class SimulationAnalysisTests(parameterized.TestCase):
             results.simulated_power_at_minimum_detectable_effect,
             results.simulated_false_positive_rate,
             results.false_positive_rate_robustness_p_value,
+            results.aa_point_estimate_robustness_p_value,
+            results.ab_point_estimate_robustness_p_value,
         ),
-        (None, None, None, None, None, None, None, None, None, None, None),
+        (
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ),
     )
 
   @parameterized.named_parameters([
@@ -1087,6 +1103,74 @@ class SimulationAnalysisTests(parameterized.TestCase):
     )
 
     self.assertAlmostEqual(results.power_robustness_p_value, 0.26272)
+
+  def test_aa_point_estimate_robustness_p_value_returns_expected_value(
+      self,
+  ):
+    design = ExperimentDesign(
+        n_items_before_trimming=60,
+        is_crossover=False,
+        runtime_weeks=6,
+        pretest_weeks=0,
+        pre_trim_top_percentile=0.0,
+        pre_trim_bottom_percentile=0.0,
+        post_trim_percentile=0.0,
+        primary_metric="clicks",
+    )
+
+    results = experiment_simulations.SimulationAnalysis(
+        design=design,
+        historical_data=self.big_historical_data,
+        minimum_start_week_id=0,
+        week_id_column="week_id",
+        item_id_column="item_id",
+        rng=np.random.default_rng(0),
+    )
+    results.estimate_minimum_detectable_effect()
+    results.validate_design(n_simulations=5)
+
+    # Override the relevant column to isolate this test
+    results.aa_simulation_results["absolute_difference"] = np.array(
+        [0.01, -0.03, 0.5, -0.3, 0.71]
+    )
+
+    self.assertAlmostEqual(
+        results.aa_point_estimate_robustness_p_value, 0.39113626
+    )
+
+  def test_ab_point_estimate_robustness_p_value_returns_expected_value(
+      self,
+  ):
+    design = ExperimentDesign(
+        n_items_before_trimming=60,
+        is_crossover=False,
+        runtime_weeks=6,
+        pretest_weeks=0,
+        pre_trim_top_percentile=0.0,
+        pre_trim_bottom_percentile=0.0,
+        post_trim_percentile=0.0,
+        primary_metric="clicks",
+    )
+
+    results = experiment_simulations.SimulationAnalysis(
+        design=design,
+        historical_data=self.big_historical_data,
+        minimum_start_week_id=0,
+        week_id_column="week_id",
+        item_id_column="item_id",
+        rng=np.random.default_rng(0),
+    )
+    results.estimate_minimum_detectable_effect()
+    results.validate_design(n_simulations=5)
+
+    # Override the relevant column to isolate this test
+    results.ab_simulation_results["absolute_difference"] = np.array(
+        [0.01, -0.03, 0.5, -0.3, 0.71]
+    )
+
+    self.assertAlmostEqual(
+        results.ab_point_estimate_robustness_p_value, 0.0152695
+    )
 
 
 if __name__ == "__main__":
