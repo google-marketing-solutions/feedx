@@ -524,7 +524,7 @@ class SimulationAnalysis:
       )
 
     if self.design.pretest_weeks > 0:
-      pivoted_data = experiment_analysis.trim_outliers(
+      pivoted_data = experiment_design.trim_outliers(
           pivoted_data,
           order_by="pretest",
           trim_percentile_top=self.design.pre_trim_top_percentile,

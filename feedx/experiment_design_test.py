@@ -18,6 +18,8 @@ import textwrap
 
 from absl.testing import absltest
 from absl.testing import parameterized
+import numpy as np
+import pandas as pd
 
 from feedx import experiment_design
 
@@ -327,6 +329,53 @@ class CoinflipTests(parameterized.TestCase):
     )
 
     self.assertLen(coinflip_unique_output, 2)
+
+
+class TrimOutliersTest(parameterized.TestCase):
+
+  def setUp(self):
+    super().setUp()
+    self.data = pd.DataFrame(
+        {"a": [10, 4, 1, 6, 3, 4, 2, 2, 5, 7], "b": ["something"] * 10}
+    )
+    self.data["a_rank"] = self.data["a"].rank(method="first")
+    self.rng = np.random.default_rng(123)
+
+  def test_if_percentiles_are_zero_no_outliers_are_trimmed(self):
+    output_data = experiment_design.trim_outliers(
+        data=self.data,
+        order_by="a",
+        trim_percentile_top=0.0,
+        trim_percentile_bottom=0.0,
+        rng=self.rng,
+    )
+    pd.testing.assert_frame_equal(output_data, self.data)
+
+  def test_if_percentiles_represent_less_than_1_row_no_outliers_are_trimmed(
+      self,
+  ):
+    output_data = experiment_design.trim_outliers(
+        data=self.data,
+        order_by="a",
+        trim_percentile_top=0.001,
+        trim_percentile_bottom=0.001,
+        rng=self.rng,
+    )
+    pd.testing.assert_frame_equal(output_data, self.data)
+
+  def test_expected_rows_are_trimmed(self):
+    output_data = experiment_design.trim_outliers(
+        data=self.data,
+        order_by="a",
+        trim_percentile_top=0.2,  # Remove top 20% rows (2 rows)
+        trim_percentile_bottom=0.1,  # Remove bottom 10% of rows (1 row)
+        rng=self.rng,
+    )
+
+    expected_data = self.data[
+        (self.data["a_rank"] >= 2) & (self.data["a_rank"] <= 8)
+    ]
+    pd.testing.assert_frame_equal(output_data, expected_data)
 
 
 if __name__ == "__main__":

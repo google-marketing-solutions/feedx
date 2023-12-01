@@ -228,3 +228,66 @@ class Coinflip:
     hex_hash = hash_num.hexdigest()
     int_hash = int(hex_hash, 16)
     return int_hash % 2
+
+
+def trim_outliers(
+    data: pd.DataFrame,
+    order_by: str,
+    trim_percentile_top: float,
+    trim_percentile_bottom: float,
+    rng: np.random.Generator,
+) -> pd.DataFrame:
+  """Trims outliers from the data.
+
+  1. Calculates the number of rows to trim from the top and bottom by
+    multiplying the trim percentile by the number of rows in the data, and
+    flooring the result.
+  2. If 0 rows are to be trimmed, return the data.
+  3. Rank the data by the order_by column, with ties being given a random order
+    using the random number generator rng.
+  4. Remove the rows to be trimmed from either end and return the data.
+
+  Args:
+    data: The data to be trimmed.
+    order_by: The column to order by to select the outliers to trim.
+    trim_percentile_top: The fraction of the highest values to remove from the
+      data.
+    trim_percentile_bottom: The fraction of the lowest values to remove from the
+      data.
+    rng: The random number generator used to break ties in the ordering.
+
+  Returns:
+    The data with the outliers trimmed.
+
+  Raises:
+    ValueError: If either of the trim_perentile_top or trim_percentile_bottom
+      are negative, or if trim_perentile_top + trim_percentile_bottom >= 1.0.
+      This is to ensure that you do not trim 100% of the data.
+  """
+  if trim_percentile_top < 0.0:
+    raise ValueError("trim_percentile_top must be >= 0.0.")
+  if trim_percentile_bottom < 0.0:
+    raise ValueError("trim_percentile_bottom must be >= 0.0.")
+  if trim_percentile_top + trim_percentile_bottom >= 1.0:
+    raise ValueError(
+        "trim_percentile_top + trim_percentile_bottom must be < 1.0, otherwise"
+        f" you will remove all the data. {trim_percentile_top = }, "
+        f"{trim_percentile_bottom = }, so "
+        f"{trim_percentile_top + trim_percentile_bottom = } >= 1.0."
+    )
+
+  n_samples = len(data.index.values)
+  n_trim_top = int(np.floor(n_samples * trim_percentile_top))
+  n_trim_bottom = int(np.floor(n_samples * trim_percentile_bottom))
+
+  if (n_trim_top == 0) & (n_trim_bottom == 0):
+    return data
+
+  min_rank = n_trim_top
+  max_rank = n_samples - n_trim_bottom
+
+  rank = data.sample(frac=1.0, random_state=rng)[order_by].rank(
+      method="first", ascending=False
+  )
+
+  return data.loc[(rank > min_rank) & (rank <= max_rank)]
