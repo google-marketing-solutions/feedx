@@ -38,7 +38,8 @@ def generate_all_valid_designs(
     traditional_design_allowed: bool,
     candidate_runtime_weeks: Collection[int],
     candidate_pretest_weeks: Collection[int],
-    candidate_pre_trim_percentiles: Collection[float],
+    candidate_pre_trim_top_percentiles: Collection[float],
+    candidate_pre_trim_bottom_percentiles: Collection[float],
     candidate_post_trim_percentiles: Collection[float],
     primary_metric: str,
     crossover_washout_weeks: int | None = None,
@@ -55,9 +56,12 @@ def generate_all_valid_designs(
       experiment.
     candidate_pretest_weeks: The options for the number of weeks for data prior
       to the start of the experiment to use for trimming and cuped adjustment.
-    candidate_pre_trim_percentiles: The options for the percetage of highest
+    candidate_pre_trim_top_percentiles: The options for the percetage of highest
       values of the primary metric to remove before the experiment begins, based
       on the pretest data.
+    candidate_pre_trim_bottom_percentiles: The options for the percetage of
+      lowest values of the primary metric to remove before the experiment
+      begins, based on the pretest data.
     candidate_post_trim_percentiles: The options for the percetage of highest
       and lowest values of the primary metric to remove from the analysis after
       the experiment has concluded, based on the runtime data.
@@ -88,17 +92,20 @@ def generate_all_valid_designs(
   design_inputs = itertools.product(
       candidate_runtime_weeks,
       candidate_pretest_weeks,
-      candidate_pre_trim_percentiles,
+      candidate_pre_trim_top_percentiles,
+      candidate_pre_trim_bottom_percentiles,
       candidate_post_trim_percentiles,
   )
 
   for (
       runtime_weeks,
       pretest_weeks,
-      pre_trim_percentile,
+      pre_trim_top_percentile,
+      pre_trim_bottom_percentile,
       post_trim_percentile,
   ) in design_inputs:
-    if (pre_trim_percentile > 0) & (pretest_weeks == 0):
+    has_pretrimming = (pre_trim_top_percentile + pre_trim_bottom_percentile) > 0
+    if has_pretrimming & (pretest_weeks == 0):
       # Cannot do pretrimming without pretest weeks.
       continue
 
@@ -107,8 +114,8 @@ def generate_all_valid_designs(
           ExperimentDesign(
               runtime_weeks=runtime_weeks,
               pretest_weeks=pretest_weeks,
-              pre_trim_top_percentile=pre_trim_percentile,
-              pre_trim_bottom_percentile=0.0,
+              pre_trim_top_percentile=pre_trim_top_percentile,
+              pre_trim_bottom_percentile=pre_trim_bottom_percentile,
               post_trim_percentile=post_trim_percentile,
               is_crossover=False,
               **design_constants,
@@ -126,8 +133,8 @@ def generate_all_valid_designs(
           ExperimentDesign(
               runtime_weeks=runtime_weeks,
               pretest_weeks=pretest_weeks,
-              pre_trim_top_percentile=pre_trim_percentile,
-              pre_trim_bottom_percentile=0.0,
+              pre_trim_top_percentile=pre_trim_top_percentile,
+              pre_trim_bottom_percentile=pre_trim_bottom_percentile,
               post_trim_percentile=post_trim_percentile,
               is_crossover=True,
               crossover_washout_weeks=crossover_washout_weeks,
