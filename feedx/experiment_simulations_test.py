@@ -116,12 +116,14 @@ class ExperimentSimulationsTest(parameterized.TestCase):
     self.assertFalse(any(has_pre_trim_but_no_pretest_weeks))
 
   def test_bootstrap_sample_samples_rows_from_input_data(self):
-    input_data = pd.DataFrame(
-        {"a": [1, 2, 3, 4, 5, 6], "b": [7, 8, 9, 10, 11, 12]}
-    )
+    input_data = pd.DataFrame({
+        "a": [1, 2, 3, 4, 5, 6],
+        "b": [7, 8, 9, 10, 11, 12],
+        "item_id": [1, 2, 3, 4, 5, 6],
+    }).set_index("item_id")
     rng = np.random.default_rng(123)
     sampled_data = experiment_simulations._bootstrap_sample_data(
-        input_data, rng
+        input_data, rng, item_id_index_name="item_id"
     )
 
     unique_rows_from_sample = set(
@@ -134,12 +136,14 @@ class ExperimentSimulationsTest(parameterized.TestCase):
     self.assertEmpty(new_rows)
 
   def test_bootstrap_sample_samples_input_data_with_replacement(self):
-    input_data = pd.DataFrame(
-        {"a": [1, 2, 3, 4, 5, 6], "b": [7, 8, 9, 10, 11, 12]}
-    )
+    input_data = pd.DataFrame({
+        "a": [1, 2, 3, 4, 5, 6],
+        "b": [7, 8, 9, 10, 11, 12],
+        "item_id": [1, 2, 3, 4, 5, 6],
+    }).set_index("item_id")
     rng = np.random.default_rng(123)
     sampled_data = experiment_simulations._bootstrap_sample_data(
-        input_data, rng
+        input_data, rng, item_id_index_name="item_id"
     )
 
     # Because we are sampling with replacement, assert that there are some
@@ -153,26 +157,77 @@ class ExperimentSimulationsTest(parameterized.TestCase):
   def test_bootstrap_sample_raises_exception_if_sample_weight_column_exists(
       self,
   ):
-    input_data = pd.DataFrame(
-        {"a": [1, 2, 3, 4, 5, 6], "b": [7, 8, 9, 10, 11, 12]}
-    )
+    input_data = pd.DataFrame({
+        "sample_weight": [1, 2, 3, 4, 5, 6],
+        "b": [7, 8, 9, 10, 11, 12],
+        "item_id": [1, 2, 3, 4, 5, 6],
+    }).set_index("item_id")
     rng = np.random.default_rng(123)
 
-    with self.assertRaises(ValueError):
+    with self.assertRaisesWithLiteralMatch(
+        ValueError,
+        "The input data must not contain the following columns: "
+        "{'sample_weight'}",
+    ):
       experiment_simulations._bootstrap_sample_data(
-          input_data, rng, sample_weight_column="a"
+          input_data,
+          rng,
+          sample_weight_column="sample_weight",
+          item_id_index_name="item_id",
       )
 
   def test_bootstrap_sample_raises_exception_if_dummy_list_column_exists(self):
-    input_data = pd.DataFrame(
-        {"a": [1, 2, 3, 4, 5, 6], "b": [7, 8, 9, 10, 11, 12]}
-    )
+    input_data = pd.DataFrame({
+        "dummy_list": [1, 2, 3, 4, 5, 6],
+        "b": [7, 8, 9, 10, 11, 12],
+        "item_id": [1, 2, 3, 4, 5, 6],
+    }).set_index("item_id")
     rng = np.random.default_rng(123)
 
-    with self.assertRaises(ValueError):
+    with self.assertRaisesWithLiteralMatch(
+        ValueError,
+        "The input data must not contain the following columns: {'dummy_list'}",
+    ):
       experiment_simulations._bootstrap_sample_data(
-          input_data, rng, dummy_list_column="a"
+          input_data,
+          rng,
+          dummy_list_column="dummy_list",
+          item_id_index_name="item_id",
       )
+
+  def test_bootstrap_sample_overwrites_item_ids_with_unique_item_ids(self):
+    input_data = pd.DataFrame({
+        "a": [1, 2, 3, 4, 5, 6],
+        "b": [7, 8, 9, 10, 11, 12],
+        "item_id": [6, 7, 8, 9, 10, 11],
+    }).set_index("item_id")
+    rng = np.random.default_rng(123)
+
+    sampled_data = experiment_simulations._bootstrap_sample_data(
+        input_data, rng, item_id_index_name="item_id"
+    )
+
+    expected_index = pd.Index(range(6), name="item_id")
+    pd.testing.assert_index_equal(sampled_data.index, expected_index)
+
+  def test_bootstrap_sample_overwrites_item_ids_with_unique_item_ids_for_multiindex(
+      self,
+  ):
+    input_data = pd.DataFrame({
+        "a": [1, 2, 3, 4, 5, 6],
+        "b": [7, 8, 9, 10, 11, 12],
+        "item_id": [6, 7, 8, 9, 10, 11],
+        "treatment": [0, 0, 0, 1, 1, 1],
+    }).set_index(["item_id", "treatment"])
+    rng = np.random.default_rng(123)
+
+    sampled_data = experiment_simulations._bootstrap_sample_data(
+        input_data, rng, item_id_index_name="item_id"
+    )
+    expected_index = np.arange(6)
+    np.testing.assert_array_equal(
+        sampled_data.index.get_level_values("item_id"), expected_index
+    )
 
 
 class CalculateMinStartWeekTests(parameterized.TestCase):

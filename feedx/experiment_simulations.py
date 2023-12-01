@@ -175,6 +175,7 @@ def calculate_minimum_start_week_id(
 def _bootstrap_sample_data(
     data: pd.DataFrame,
     rng: np.random.Generator,
+    item_id_index_name: str,
     sample_weight_column: str = "n_samples_",
     dummy_list_column: str = "dummy_list_",
 ) -> pd.DataFrame:
@@ -183,14 +184,13 @@ def _bootstrap_sample_data(
   This creates a bootstrap sampled copy of the data, which is the equivalent
   of sampling the same number of rows as in the original set, with replacement.
 
-  Instead of doing the actual sampling, we use poisson bootstrapping, which
-  is more efficient but approximate (it won't always return exactly the same
-  sample size as the original data). However for large samples it's a good
-  approximation and it's more efficient.
+  The item_id_index_name is overwritten with a new index, to ensure it is
+  unique.
 
   Args:
     data: The dataset to sample.
     rng: A random number generator to perform the sampling.
+    item_id_index_name: The name of the index level containing the item id.
     sample_weight_column: A column name used internally to do the sampling. It
       is not returned, and it should not already exist in the data.
     dummy_list_column: The column name used internally to do the sampling. It is
@@ -207,22 +207,25 @@ def _bootstrap_sample_data(
   if protected_columns & set(data.columns):
     raise ValueError(
         "The input data must not contain the following columns: "
-        f"{protected_columns}"
+        f"{protected_columns & set(data.columns)}"
     )
+  sampled_data = data.sample(frac=1.0, random_state=rng, replace=True)
+  new_item_ids = np.arange(len(sampled_data.index.values))
 
-  copied_data = data.copy()
-  copied_data[sample_weight_column] = rng.poisson(
-      lam=1.0, size=len(copied_data.index.values)
-  )
-  copied_data[dummy_list_column] = copied_data[sample_weight_column].apply(
-      np.arange
-  )
-  exploded_data = (
-      copied_data.explode(dummy_list_column)
-      .dropna(axis=0, subset=[dummy_list_column])
-      .drop(columns=[dummy_list_column, sample_weight_column])
-  )
-  return exploded_data
+  if isinstance(data.index, pd.MultiIndex):
+    new_array_values = [
+        new_item_ids
+        if name == item_id_index_name
+        else sampled_data.index.get_level_values(name)
+        for name in sampled_data.index.names
+    ]
+    sampled_data.index = pd.MultiIndex.from_arrays(
+        new_array_values, names=sampled_data.index.names
+    )
+  else:
+    sampled_data.index = pd.Index(new_item_ids, name=item_id_index_name)
+
+  return sampled_data
 
 
 def apply_random_treatment_assignment(
@@ -507,7 +510,9 @@ class SimulationAnalysis:
     )[self.design.primary_metric]
 
     if bootstrap_sample:
-      pivoted_data = _bootstrap_sample_data(pivoted_data, self.rng)
+      pivoted_data = _bootstrap_sample_data(
+          pivoted_data, self.rng, self.item_id_column
+      )
 
     if (not bootstrap_sample) and (
         len(pivoted_data.index.values) != self.design.n_items_before_trimming
