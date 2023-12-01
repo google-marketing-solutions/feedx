@@ -310,4 +310,4 @@ def trim_outliers(
       method="first", ascending=False
   )
 
-  return data.loc[(rank > min_rank) & (rank <= max_rank)]
+  return data.loc[(rank > min_rank) & (rank <= max_rank)].copy()
