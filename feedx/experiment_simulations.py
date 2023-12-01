@@ -33,7 +33,7 @@ ExperimentDesign = experiment_design.ExperimentDesign
 
 
 def generate_all_valid_designs(
-    max_items_for_test: Collection[int],
+    n_items_before_trimming: int,
     crossover_design_allowed: bool,
     traditional_design_allowed: bool,
     candidate_runtime_weeks: Collection[int],
@@ -43,26 +43,36 @@ def generate_all_valid_designs(
     primary_metric: str,
     crossover_washout_weeks: int | None = None,
 ) -> list[ExperimentDesign]:
-  """Generate valid experiment designs with user-defined parameters.
+  """Generates valid experiment designs with user-defined parameters.
+
+  This will generate all valid combinations of the candidate parameters.
 
   Args:
-    max_items_for_test: number of items to test
-    crossover_design_allowed: crossover experiment design is allowed
-    traditional_design_allowed: traditional experiment design is allowed
-    candidate_runtime_weeks: number of weeks to run the experiment
-    candidate_pretest_weeks: number of weeks for data prior to the experiment
-    candidate_pre_trim_percentiles: percetage at which to omit the lowest and 
-      highest values of the primary metric from the experiment, eg remove 1% of 
-      the lowest and 1% of the highest values from the experiment
-    candidate_post_trim_percentiles: percetage at which to omit the lowest and 
-      highest values of the primary metric from the analysis, eg remove 1% of 
-      the lowest and 1% of the highest values from the analysis
-    primary_metric: ads performance metric on which to base experiment design
-    crossover_washout_weeks: number of weeks to exclude at the start of each
-      crossover period
+    n_items_before_trimming: The number of items in the data before trimming.
+    crossover_design_allowed: Is a crossover experiment design allowed?
+    traditional_design_allowed: Is a traditional experiment design allowed?
+    candidate_runtime_weeks: The options for the number of weeks to run the
+      experiment.
+    candidate_pretest_weeks: The options for the number of weeks for data prior
+      to the start of the experiment to use for trimming and cuped adjustment.
+    candidate_pre_trim_percentiles: The options for the percetage of highest
+      values of the primary metric to remove before the experiment begins, based
+      on the pretest data.
+    candidate_post_trim_percentiles: The options for the percetage of highest
+      and lowest values of the primary metric to remove from the analysis after
+      the experiment has concluded, based on the runtime data.
+    primary_metric: The main ads performance metric to design the experiment
+      for.
+    crossover_washout_weeks: The number of weeks to exclude at the start of each
+      crossover period, if using a crossover experiment. None if crossover is
+      not allowed.
 
   Returns:
     List of valid experiment designs
+
+  Raises:
+    ValueError: If the crossover_washout_weeks are not specified but
+      crossover_design_allowed is True.
   """
   if crossover_design_allowed & (crossover_washout_weeks is None):
     raise ValueError(
@@ -72,10 +82,10 @@ def generate_all_valid_designs(
 
   valid_designs = []
   design_constants = dict(
+      n_items_before_trimming=n_items_before_trimming,
       primary_metric=primary_metric,
   )
   design_inputs = itertools.product(
-      max_items_for_test,
       candidate_runtime_weeks,
       candidate_pretest_weeks,
       candidate_pre_trim_percentiles,
@@ -83,7 +93,6 @@ def generate_all_valid_designs(
   )
 
   for (
-      n_items,
       runtime_weeks,
       pretest_weeks,
       pre_trim_percentile,
@@ -96,7 +105,6 @@ def generate_all_valid_designs(
     if traditional_design_allowed:
       valid_designs.append(
           ExperimentDesign(
-              n_items_before_trimming=n_items,
               runtime_weeks=runtime_weeks,
               pretest_weeks=pretest_weeks,
               pre_trim_top_percentile=pre_trim_percentile,
@@ -116,7 +124,6 @@ def generate_all_valid_designs(
     if can_crossover:
       valid_designs.append(
           ExperimentDesign(
-              n_items_before_trimming=n_items,
               runtime_weeks=runtime_weeks,
               pretest_weeks=pretest_weeks,
               pre_trim_top_percentile=pre_trim_percentile,

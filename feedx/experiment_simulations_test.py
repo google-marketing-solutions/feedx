@@ -31,7 +31,7 @@ class ExperimentSimulationsTest(parameterized.TestCase):
 
   def test_generate_all_valid_designs(self):
     actual_designs = experiment_simulations.generate_all_valid_designs(
-        max_items_for_test=[500],
+        n_items_before_trimming=500,
         crossover_design_allowed=True,
         traditional_design_allowed=False,
         candidate_runtime_weeks=[6, 8],
@@ -94,7 +94,7 @@ class ExperimentSimulationsTest(parameterized.TestCase):
       self,
   ):
     generated_designs = experiment_simulations.generate_all_valid_designs(
-        max_items_for_test=[500],
+        n_items_before_trimming=500,
         crossover_design_allowed=True,
         traditional_design_allowed=False,
         candidate_runtime_weeks=[6, 8],
