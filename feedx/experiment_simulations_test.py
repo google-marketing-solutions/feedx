@@ -436,7 +436,7 @@ class SimulationAnalysisTests(parameterized.TestCase):
             results.null_p_value_robustness_p_value,
             results.ab_robustness_pvalue,
             results.power_at_minimum_detectable_effect,
-            results.false_positive_rate,
+            results.simulated_false_positive_rate,
         ),
         (None, None, None, None, None, None, None, None, None, None),
     )
@@ -958,6 +958,36 @@ class SimulationAnalysisTests(parameterized.TestCase):
     )
 
     self.assertAlmostEqual(results.null_p_value_robustness_p_value, 0.664)
+
+  def test_simulated_false_positive_rate_returns_expected_value(self):
+    design = ExperimentDesign(
+        n_items_before_trimming=60,
+        is_crossover=False,
+        runtime_weeks=6,
+        pretest_weeks=0,
+        pre_trim_top_percentile=0.0,
+        pre_trim_bottom_percentile=0.0,
+        post_trim_percentile=0.0,
+        primary_metric="clicks",
+    )
+
+    results = experiment_simulations.SimulationAnalysis(
+        design=design,
+        historical_data=self.big_historical_data,
+        minimum_start_week_id=0,
+        week_id_column="week_id",
+        item_id_column="item_id",
+        rng=np.random.default_rng(0),
+    )
+    results.estimate_minimum_detectable_effect()
+    results.validate_design(n_simulations=5)
+
+    # Override the relevant column to isolate this test
+    results.aa_simulation_results["p_value"] = np.array(
+        [0.01, 0.2, 0.5, 0.3, 0.8]
+    )
+
+    self.assertAlmostEqual(results.simulated_false_positive_rate, 0.2)
 
 
 if __name__ == "__main__":

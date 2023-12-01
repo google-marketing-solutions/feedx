@@ -388,8 +388,8 @@ class SimulationAnalysis:
     power_at_minimum_detectable_effect: The actual simulated power for the
       minimum detectable effect, should be close to design.power. None if the
       validation has not been run.
-    false_positive_rate: The actual simulated false positive rate, should be
-      close to design.alpha. None if the validation has not been run.
+    simulated_false_positive_rate: The actual simulated false positive rate,
+      should be close to design.alpha. None if the validation has not been run.
     aa_simulation_results: The full A/A simulation results. None if the
       validation has not been run.
     ab_simulation_results: The full A/B simulation results. None if the
@@ -423,9 +423,6 @@ class SimulationAnalysis:
       default=None, init=False
   )
   power_at_minimum_detectable_effect: float | None = dataclasses.field(
-      default=None, init=False
-  )
-  false_positive_rate: float | None = dataclasses.field(
       default=None, init=False
   )
 
@@ -823,3 +820,27 @@ class SimulationAnalysis:
     return stats.kstest(
         self.aa_simulation_results["p_value"].values, stats.uniform.cdf
     ).pvalue
+
+  @property
+  def _aa_is_statistically_significant(self) -> np.ndarray | None:
+    if self.aa_simulation_results is None:
+      return None
+
+    return (
+        self.aa_simulation_results["p_value"].values < self.design.alpha
+    ).astype(int)
+
+  @property
+  def simulated_false_positive_rate(self) -> float | None:
+    """Returns the simulated false positive rate from the A/A tests.
+
+    In A/A tests there is no true effect, so any statistically significant
+    results are false positives. The false positive rate should be close to
+    design.alpha.
+
+    If the validate_design() method has not yet been run, this returns None.
+    """
+    if self.aa_simulation_results is None:
+      return None
+
+    return np.mean(self._aa_is_statistically_significant)
