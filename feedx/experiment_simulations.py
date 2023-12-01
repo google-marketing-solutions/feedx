@@ -408,6 +408,28 @@ class SimulationAnalysis:
       validation has not been run.
     ab_simulation_results: The full A/B simulation results. None if the
       validation has not been run.
+    robustness_p_value_threshold: The value to compare all the robustness
+      p-values against to see if they pass. This should be very small, as
+      normally the experiments will be valid, so there needs to be strong
+      evidence to conclude otherwise. Defaults to 0.0001.
+    null_p_value_robustness_check_pass: The null p_value robustness check
+      passes, meaning the p_value is higher than the
+      robustness_p_value_threshold. None if the validation has not been run.
+    false_positive_rate_robustness_check_pass: The false positive rate
+      robustness check passes, meaning the p_value is higher than the
+      robustness_p_value_threshold. None if the validation has not been run.
+    power_robustness_check_pass: The power robustness check passes, meaning the
+      p_value is higher than the robustness_p_value_threshold. None if the
+      validation has not been run.
+    aa_point_estimate_robustness_check_pass: The A/A test point estimate
+      robustness check passes, meaning the p_value is higher than the
+      robustness_p_value_threshold. None if the validation has not been run.
+    ab_point_estimate_robustness_check_pass: The A/B test point estimate
+      robustness check passes, meaning the p_value is higher than the
+      robustness_p_value_threshold. None if the validation has not been run.
+    all_robustness_checks_pass: All the robustness checks pass, meaning all of
+      the p-values are above the robustness_p_value_threshold. None if the
+      validation has not been run.
   """
 
   design: ExperimentDesign = dataclasses.field(repr=False)
@@ -419,6 +441,9 @@ class SimulationAnalysis:
   rng: np.random.Generator = dataclasses.field(repr=False)
   time_period_column: str = dataclasses.field(repr=False, default="time_period")
   treatment_column: str = dataclasses.field(repr=False, default="treatment")
+  robustness_p_value_threshold: float = dataclasses.field(
+      repr=False, default=0.0001
+  )
 
   minimum_detectable_effect: float | None = dataclasses.field(
       default=None, init=False
@@ -952,3 +977,63 @@ class SimulationAnalysis:
         self.ab_simulation_results["absolute_difference"].values,
         self.minimum_detectable_effect,
     ).pvalue
+
+  def _is_above_p_value_threshold(self, p_value: float | None) -> bool | None:
+    """Compares a p-value with the robustness_p_value_threshold attribute.
+
+    Returns None if the p-value is None, True if the p-value is greater or
+    equal to the threshold and false otherwise.
+    """
+
+    if p_value is None:
+      return None
+
+    return p_value >= self.robustness_p_value_threshold
+
+  @property
+  def null_p_value_robustness_check_pass(self) -> bool | None:
+    """Does this design pass the null p-values robustness check."""
+    return self._is_above_p_value_threshold(
+        self.null_p_value_robustness_p_value
+    )
+
+  @property
+  def power_robustness_check_pass(self) -> bool | None:
+    """Does this design pass the power robustness check."""
+    return self._is_above_p_value_threshold(self.power_robustness_p_value)
+
+  @property
+  def aa_point_estimate_robustness_check_pass(self) -> bool | None:
+    """Does this design pass the A/A point estimate robustness check."""
+    return self._is_above_p_value_threshold(
+        self.aa_point_estimate_robustness_p_value
+    )
+
+  @property
+  def ab_point_estimate_robustness_check_pass(self) -> bool | None:
+    """Does this design pass the A/B point estimate robustness check."""
+    return self._is_above_p_value_threshold(
+        self.ab_point_estimate_robustness_p_value
+    )
+
+  @property
+  def false_positive_rate_robustness_check_pass(self) -> bool | None:
+    """Does this design pass the false positive rate robustness check."""
+    return self._is_above_p_value_threshold(
+        self.false_positive_rate_robustness_p_value
+    )
+
+  @property
+  def all_robustness_checks_pass(self) -> bool | None:
+    """Does this design pass all robustness checks."""
+    robustness_checks = [
+        self.null_p_value_robustness_check_pass,
+        self.power_robustness_check_pass,
+        self.false_positive_rate_robustness_check_pass,
+        self.aa_point_estimate_robustness_check_pass,
+        self.ab_point_estimate_robustness_check_pass,
+    ]
+    if any([check is None for check in robustness_checks]):
+      return None
+    else:
+      return all(robustness_checks)

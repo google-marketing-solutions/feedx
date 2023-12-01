@@ -440,8 +440,20 @@ class SimulationAnalysisTests(parameterized.TestCase):
             results.false_positive_rate_robustness_p_value,
             results.aa_point_estimate_robustness_p_value,
             results.ab_point_estimate_robustness_p_value,
+            results.null_p_value_robustness_check_pass,
+            results.power_robustness_check_pass,
+            results.false_positive_rate_robustness_check_pass,
+            results.aa_point_estimate_robustness_check_pass,
+            results.ab_point_estimate_robustness_check_pass,
+            results.all_robustness_checks_pass,
         ),
         (
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
             None,
             None,
             None,
@@ -1171,6 +1183,153 @@ class SimulationAnalysisTests(parameterized.TestCase):
     self.assertAlmostEqual(
         results.ab_point_estimate_robustness_p_value, 0.0152695
     )
+
+  @parameterized.parameters(
+      "null_p_value",
+      "power",
+      "false_positive_rate",
+      "ab_point_estimate",
+      "aa_point_estimate",
+  )
+  def test_robustness_checks_return_false_if_pvalue_smaller_than_threshold(
+      self, robustness_check
+  ):
+    design = ExperimentDesign(
+        n_items_before_trimming=60,
+        is_crossover=False,
+        runtime_weeks=6,
+        pretest_weeks=0,
+        pre_trim_top_percentile=0.0,
+        pre_trim_bottom_percentile=0.0,
+        post_trim_percentile=0.0,
+        primary_metric="clicks",
+    )
+
+    with mock.patch.object(
+        experiment_simulations.SimulationAnalysis,
+        f"{robustness_check}_robustness_p_value",
+        new_callable=mock.PropertyMock,
+    ) as mock_p_value:
+      mock_p_value.return_value = 0.00001
+      results = experiment_simulations.SimulationAnalysis(
+          design=design,
+          historical_data=self.big_historical_data,
+          minimum_start_week_id=0,
+          week_id_column="week_id",
+          item_id_column="item_id",
+          rng=np.random.default_rng(0),
+      )
+      self.assertFalse(
+          getattr(results, f"{robustness_check}_robustness_check_pass")
+      )
+
+  @parameterized.parameters(
+      "null_p_value",
+      "power",
+      "false_positive_rate",
+      "ab_point_estimate",
+      "aa_point_estimate",
+  )
+  def test_robustness_checks_return_true_if_pvalue_higher_than_threshold(
+      self, robustness_check
+  ):
+    design = ExperimentDesign(
+        n_items_before_trimming=60,
+        is_crossover=False,
+        runtime_weeks=6,
+        pretest_weeks=0,
+        pre_trim_top_percentile=0.0,
+        pre_trim_bottom_percentile=0.0,
+        post_trim_percentile=0.0,
+        primary_metric="clicks",
+    )
+
+    with mock.patch.object(
+        experiment_simulations.SimulationAnalysis,
+        f"{robustness_check}_robustness_p_value",
+        new_callable=mock.PropertyMock,
+    ) as mock_p_value:
+      mock_p_value.return_value = 0.99999
+      results = experiment_simulations.SimulationAnalysis(
+          design=design,
+          historical_data=self.big_historical_data,
+          minimum_start_week_id=0,
+          week_id_column="week_id",
+          item_id_column="item_id",
+          rng=np.random.default_rng(0),
+      )
+      self.assertTrue(
+          getattr(results, f"{robustness_check}_robustness_check_pass")
+      )
+
+  def test_all_robustness_checks_pass_returns_true_if_all_are_true(self):
+    design = ExperimentDesign(
+        n_items_before_trimming=60,
+        is_crossover=False,
+        runtime_weeks=6,
+        pretest_weeks=0,
+        pre_trim_top_percentile=0.0,
+        pre_trim_bottom_percentile=0.0,
+        post_trim_percentile=0.0,
+        primary_metric="clicks",
+    )
+
+    with mock.patch.object(
+        experiment_simulations.SimulationAnalysis,
+        "_is_above_p_value_threshold",
+    ) as mock_is_above_p_value_threshold:
+      mock_is_above_p_value_threshold.return_value = True
+      results = experiment_simulations.SimulationAnalysis(
+          design=design,
+          historical_data=self.big_historical_data,
+          minimum_start_week_id=0,
+          week_id_column="week_id",
+          item_id_column="item_id",
+          rng=np.random.default_rng(0),
+      )
+      self.assertTrue(results.all_robustness_checks_pass)
+
+  @parameterized.parameters(
+      "null_p_value",
+      "power",
+      "false_positive_rate",
+      "ab_point_estimate",
+      "aa_point_estimate",
+  )
+  def test_all_robustness_checks_pass_returns_false_if_any_are_false(
+      self, failing_robustness_check
+  ):
+    design = ExperimentDesign(
+        n_items_before_trimming=60,
+        is_crossover=False,
+        runtime_weeks=6,
+        pretest_weeks=0,
+        pre_trim_top_percentile=0.0,
+        pre_trim_bottom_percentile=0.0,
+        post_trim_percentile=0.0,
+        primary_metric="clicks",
+    )
+
+    with mock.patch.object(
+        experiment_simulations.SimulationAnalysis,
+        "_is_above_p_value_threshold",
+    ) as mock_is_above_p_value_threshold:
+      mock_is_above_p_value_threshold.return_value = True
+      with mock.patch.object(
+          experiment_simulations.SimulationAnalysis,
+          f"{failing_robustness_check}_robustness_check_pass",
+          new_callable=mock.PropertyMock,
+      ) as mock_failing_check:
+        mock_failing_check.return_value = False
+        results = experiment_simulations.SimulationAnalysis(
+            design=design,
+            historical_data=self.big_historical_data,
+            minimum_start_week_id=0,
+            week_id_column="week_id",
+            item_id_column="item_id",
+            rng=np.random.default_rng(0),
+        )
+        self.assertFalse(results.all_robustness_checks_pass)
 
 
 if __name__ == "__main__":
