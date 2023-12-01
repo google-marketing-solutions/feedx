@@ -24,14 +24,67 @@ from feedx import data_preparation
 
 class SyntheticDataTest(parameterized.TestCase):
 
-  def test_generate_historical_synthetic_data(self):
-    # TODO(sam-bailey): Improve synthetic data tests.
-    number_samples = 500
-    hist_days = 90
+  def test_generate_historical_synthetic_data_generates_expected_number_of_rows(
+      self,
+  ):
+    n_items = 500
+    historical_days = 90
+    rng = np.random.default_rng(123)
+
     data = data_preparation.generate_historical_synthetic_data(
-        n_items=number_samples, historical_days=hist_days
+        rng=rng, n_items=n_items, historical_days=historical_days
     )
-    self.assertEqual(len(data), number_samples * hist_days)
+
+    self.assertLen(data, n_items * historical_days)
+
+  def test_generate_historical_synthetic_data_has_expected_columns(self):
+    data = data_preparation.generate_historical_synthetic_data(
+        rng=np.random.default_rng(123)
+    )
+
+    self.assertCountEqual(
+        data.columns.values, ["item_id", "date", "clicks", "impressions"]
+    )
+
+  @parameterized.parameters([-0.1, 0.0])
+  def test_generate_historical_synthetic_data_raises_exception_for_bad_impressions_average(
+      self, impressions_average
+  ):
+    with self.assertRaises(ValueError):
+      data_preparation.generate_historical_synthetic_data(
+          rng=np.random.default_rng(123),
+          impressions_average=impressions_average,
+      )
+
+  @parameterized.parameters([-0.1, 0.0])
+  def test_generate_historical_synthetic_data_raises_exception_for_bad_impressions_standard_deviation(
+      self, impressions_standard_deviation
+  ):
+    with self.assertRaises(ValueError):
+      data_preparation.generate_historical_synthetic_data(
+          rng=np.random.default_rng(123),
+          impressions_standard_deviation=impressions_standard_deviation,
+      )
+
+  @parameterized.parameters([-0.1, 0.0, 1.0, 1.1])
+  def test_generate_historical_synthetic_data_raises_exception_for_bad_ctr_average(
+      self, ctr_average
+  ):
+    with self.assertRaises(ValueError):
+      data_preparation.generate_historical_synthetic_data(
+          rng=np.random.default_rng(123),
+          ctr_average=ctr_average,
+      )
+
+  @parameterized.parameters([-0.1, 0.0, 1.0, 1.1])
+  def test_generate_historical_synthetic_data_raises_exception_for_bad_ctr_standard_deviation(
+      self, ctr_standard_deviation
+  ):
+    with self.assertRaises(ValueError):
+      data_preparation.generate_historical_synthetic_data(
+          rng=np.random.default_rng(123),
+          ctr_standard_deviation=ctr_standard_deviation,
+      )
 
 
 class StandardizeColumnNamesAndTypesTests(parameterized.TestCase):
