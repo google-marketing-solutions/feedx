@@ -236,24 +236,67 @@ class CupedTest(parameterized.TestCase):
 
     self.metric = np.array([1, 1, 2, 3, 5, 7, 8.5, 9.5, 12, 20])
     self.covariate = np.array([1, 3, 1, 4, 6, 4, 9.5, 10.5, 12, 15])
-    self.corr = np.corrcoef(self.covariate, self.metric)[1, 0]  # 0.9399
 
-  def test_variance_is_reduced_after_cuped_adjustment(self):
+  def test_with_no_trimming_the_variance_is_reduced_by_expected_amount(self):
     cuped_metric = statistics.apply_cuped_adjustment(
-        self.metric, self.covariate
+        self.metric, self.covariate, trimming_quantile=0.0
     )
 
-    self.assertLess(cuped_metric.var(), self.metric.var())
+    corr = np.corrcoef(self.covariate, self.metric)[1, 0]  # 0.9399
     self.assertAlmostEqual(
-        cuped_metric.var(), self.metric.var() * (1.0 - self.corr**2)
+        cuped_metric.var(), self.metric.var() * (1.0 - corr**2)
     )
 
-  def test_mean_is_unchanged_after_cuped_adjustment(self):
+  @parameterized.parameters(0.0, 0.1)
+  def test_variance_is_reduced_after_cuped_adjustment(self, trimming_quantile):
     cuped_metric = statistics.apply_cuped_adjustment(
-        self.metric, self.covariate
+        self.metric, self.covariate, trimming_quantile
     )
 
-    self.assertAlmostEqual(cuped_metric.mean(), self.metric.mean())
+    cuped_var = statistics.TrimmedArray(
+        cuped_metric, quantile=trimming_quantile
+    ).var(ddof=1)
+    original_var = statistics.TrimmedArray(
+        self.metric, quantile=trimming_quantile
+    ).var(ddof=1)
+    n_trim = statistics.TrimmedArray(
+        self.metric, quantile=trimming_quantile
+    ).n_trim
+
+    if trimming_quantile > 0.0:
+      # If trimming, check that something is actually being trimmed
+      # if it's not then this test is not valid. It can happen that
+      # the trimming quantile is non-zero but nothing is trimmed if the
+      # sample size is small enough that the number of samples to be
+      # trimmed is rounded to 0.
+      self.assertGreater(n_trim, 0)
+
+    self.assertLess(cuped_var, original_var)
+
+  @parameterized.parameters(0.0, 0.1)
+  def test_mean_is_unchanged_after_cuped_adjustment(self, trimming_quantile):
+    cuped_metric = statistics.apply_cuped_adjustment(
+        self.metric, self.covariate, trimming_quantile
+    )
+
+    cuped_mean = statistics.TrimmedArray(
+        cuped_metric, quantile=trimming_quantile
+    ).mean()
+    original_mean = statistics.TrimmedArray(
+        self.metric, quantile=trimming_quantile
+    ).mean()
+    n_trim = statistics.TrimmedArray(
+        self.metric, quantile=trimming_quantile
+    ).n_trim
+
+    if trimming_quantile > 0.0:
+      # If trimming, check that something is actually being trimmed
+      # if it's not then this test is not valid. It can happen that
+      # the trimming quantile is non-zero but nothing is trimmed if the
+      # sample size is small enough that the number of samples to be
+      # trimmed is rounded to 0.
+      self.assertGreater(n_trim, 0)
+    self.assertAlmostEqual(cuped_mean, original_mean)
 
 
 class YuensTTestIndTest(parameterized.TestCase):

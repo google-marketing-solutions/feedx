@@ -587,7 +587,9 @@ class SimulationAnalysis:
     else:
       if "pretest" in pivoted_data.columns:
         pivoted_data["test"] = statistics.apply_cuped_adjustment(
-            pivoted_data["test"].values, pivoted_data["pretest"].values
+            pivoted_data["test"].values,
+            pivoted_data["pretest"].values,
+            self.design.post_trim_percentile
         )
 
       primary_metric = statistics.TrimmedArray(

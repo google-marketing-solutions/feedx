@@ -416,7 +416,7 @@ def _analyze_regular_experiment(
   """
   if "pretest" in data.columns:
     y = statistics.apply_cuped_adjustment(
-        data["test"].values, data["pretest"].values
+        data["test"].values, data["pretest"].values, post_trim_percentile
     )
   else:
     y = data["test"].values

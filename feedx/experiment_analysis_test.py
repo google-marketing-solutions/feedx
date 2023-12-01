@@ -143,11 +143,13 @@ class ExperimentAnalysisTest(parameterized.TestCase):
 
     with mock.patch(
         "google3.third_party.professional_services.solutions.feedx.feedx.statistics.apply_cuped_adjustment",
-        side_effect=lambda x, y: x,
+        side_effect=lambda x, *y: x,
     ) as mock_apply_cuped_adjustment:
       experiment_analysis.analyze_experiment(data, design)
       mock_apply_cuped_adjustment.assert_called_once_with(
-          data["test"].values, data["pretest"].values
+          data["test"].values,
+          data["pretest"].values,
+          design.post_trim_percentile,
       )
 
   def test_analyze_regular_experiment_does_not_use_cuped_when_pretest_is_not_provided(

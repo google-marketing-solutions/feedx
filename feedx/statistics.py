@@ -239,11 +239,19 @@ class TrimmedArray:
 
 
 def apply_cuped_adjustment(
-    metric: np.ndarray, covariate: np.ndarray
+    metric: np.ndarray, covariate: np.ndarray, trimming_quantile: float
 ) -> np.ndarray:
   """Applies CUPED to control for pre-experiment covariates.
 
-  This method applies a CUPED ajustment to a 1-d array.
+  This method applies a CUPED ajustment to a 1-d array. This adjustment reduces
+  the (trimmed) variance by adjusting the metric with the covariate, while
+  keeping the (trimmed) mean unchanged.
+
+  Note: trimming is only applied when calculating the means and covariance
+  matrix, it is not applied to the final output, meaning the output
+  still contains the complete sample of data and must be trimmed again if
+  required.
+
   The formula for CUPED is:
 
     cuped_metric = (
@@ -251,11 +259,12 @@ def apply_cuped_adjustment(
         cov(metric, covariate) / var(covariate) * (covariate - mean(covariate))
     )
 
-  After the CUPED adjustment, the mean of the metric will be unchanged, but
-  the variance should be reduced. The amount by which the variance is reduced
-  depends on the correlation between the covariate and the metric:
+  After the CUPED adjustment, the (trimmed) mean of the metric will be
+  unchanged, but the variance should be reduced. The amount by which the
+  variance is reduced depends on the correlation between the covariate and
+  the metric:
 
-    var(cuped_metric) = var(metric) * (1 - corr(metric, cuped_metric)**2)
+    var(cuped_metric) = var(metric) * (1 - corr(metric, covariate)**2)
 
   References:
     https://ai.stanford.edu/users/ronnyk.link/2013-02CUPEDImprovingSensitivityOfControlledExperiments.pdf
@@ -263,6 +272,8 @@ def apply_cuped_adjustment(
   Args:
     metric: An array containing the metric to adjust.
     covariate: An array containing the covariate used to perform the adjustment.
+    trimming_quantile: The fraction of samples to trim from each side of the
+      metric when calculating the means and covariance matrix.
 
   Returns:
     The cuped adjusted metric.
@@ -272,10 +283,39 @@ def apply_cuped_adjustment(
 
   metric_and_covariate = np.stack([metric, covariate], axis=0)
   covariance_matrix = np.cov(metric_and_covariate)
-  theta = covariance_matrix[0, 1] / covariance_matrix[1, 1]
-  y_cuped = metric - theta * (covariate - np.mean(covariate))
+  theta = (
+      covariance_matrix[0, 1] / covariance_matrix[1, 1]
+  )
+  cuped_metric = metric - theta * (covariate - np.mean(covariate))
 
-  return y_cuped
+  trimmed_metric_and_covariate = TrimmedArray(
+      np.stack([cuped_metric, metric, covariate], axis=0),
+      trimming_quantile
+  )
+  if trimmed_metric_and_covariate.n_trim == 0:
+    return cuped_metric
+
+  trimmed_covariance_matrix = trimmed_metric_and_covariate.cov()
+  trimmed_theta = (
+      trimmed_covariance_matrix[1, 2] / trimmed_covariance_matrix[2, 2]
+  )
+  cuped_metric_no_offset = metric - trimmed_theta * covariate
+
+  trimmed_metric = TrimmedArray(metric, trimming_quantile)
+  trimmed_cuped_metric_no_offset = TrimmedArray(
+      cuped_metric_no_offset, 
+      trimming_quantile
+  )
+  cuped_metric = (
+      cuped_metric_no_offset
+      + trimmed_metric.mean()
+      - trimmed_cuped_metric_no_offset.mean()
+  )
+
+  if trimmed_cuped_metric_no_offset.var() < trimmed_metric.var():
+    return cuped_metric
+  else:
+    return metric
 
 
 @dataclasses.dataclass
