@@ -365,3 +365,45 @@ def downsample_items(
       f" {data[item_id_column].nunique()} items."
   )
   return data
+
+
+def _validate_items_and_dates_are_unique(
+    data: pd.DataFrame, item_id_column: str, date_column: str
+) -> None:
+  """Validates that the item_id + date combinations are unique."""
+  n_rows = data.shape[0]
+  n_unique_rows = data[[item_id_column, date_column]].drop_duplicates().shape[0]
+
+  if n_rows != n_unique_rows:
+    raise ValueError(
+        f"There are duplicate rows in the data: {n_rows = },"
+        f" {n_unique_rows = }."
+    )
+  else:
+    print("There are no duplicate items and dates, check passed.")
+
+
+def validate_historical_data(
+    historical_data: pd.DataFrame,
+    item_id_column: str,
+    date_column: str,
+) -> None:
+  """Runs all the required validation for the historical data.
+
+  The historical data is used to perform simulations to design the optimal
+  experiment. This validates that:
+
+  - The item_ids + dates combinations are unique.
+
+  Args:
+    historical_data: The historical data to be validated.
+    item_id_column: The column in the data contining the item identifier.
+    date_column: The column in the data containing the date.
+
+  Raises:
+    ValueError: If any of the validations fail.
+  """
+
+  _validate_items_and_dates_are_unique(
+      historical_data, item_id_column=item_id_column, date_column=date_column
+  )

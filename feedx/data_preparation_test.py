@@ -200,5 +200,39 @@ class DownsampleItemsTests(parameterized.TestCase):
       )
 
 
+class DataValidationTests(parameterized.TestCase):
+
+  def test_validate_historical_data_passes_for_good_data(self):
+    historical_data = pd.DataFrame({
+        "date": ["2023-10-01", "2023-10-01", "2023-10-02", "2023-10-02"],
+        "item_id": ["1", "2", "1", "2"],
+    })
+
+    data_preparation.validate_historical_data(
+        historical_data,
+        item_id_column="item_id",
+        date_column="date",
+    )
+
+  def test_historical_data_must_have_unique_item_id_and_dates(self):
+    bad_historical_data = pd.DataFrame({
+        "date": [
+            "2023-10-01",
+            "2023-10-01",
+            "2023-10-02",
+            "2023-10-02",
+            "2023-10-02",
+        ],
+        "item_id": ["1", "2", "1", "2", "2"],
+    })
+
+    with self.assertRaises(ValueError):
+      data_preparation.validate_historical_data(
+          bad_historical_data,
+          item_id_column="item_id",
+          date_column="date",
+      )
+
+
 if __name__ == "__main__":
   absltest.main()
