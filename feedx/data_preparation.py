@@ -367,20 +367,46 @@ def downsample_items(
   return data
 
 
-def _validate_items_and_dates_are_unique(
-    data: pd.DataFrame, item_id_column: str, date_column: str
+def _validate_every_value_exists_exactly_once_for_every_group(
+    data: pd.DataFrame,
+    *,
+    value_column: str,
+    group_column: str,
 ) -> None:
-  """Validates that the item_id + date combinations are unique."""
-  n_rows = data.shape[0]
-  n_unique_rows = data[[item_id_column, date_column]].drop_duplicates().shape[0]
+  """Validates that every value exists exactly once in every group."""
+  value_counts_per_group = (
+      data[[group_column, value_column]]
+      .groupby(group_column)
+      .count()[value_column]
+  )
 
-  if n_rows != n_unique_rows:
+  unique_value_counts_per_group = (
+      data[[group_column, value_column]]
+      .groupby(group_column)
+      .nunique()[value_column]
+  )
+
+  if np.any(value_counts_per_group != unique_value_counts_per_group):
+    bad_groups = value_counts_per_group.loc[
+        value_counts_per_group != unique_value_counts_per_group
+    ].index.values
     raise ValueError(
-        f"There are duplicate rows in the data: {n_rows = },"
-        f" {n_unique_rows = }."
+        f"There are duplicate {value_column} when {group_column} in "
+        f"{bad_groups}"
+    )
+
+  value_counts_first_group = value_counts_per_group.values[0]
+  if np.any(value_counts_per_group.values != value_counts_first_group):
+    raise ValueError(
+        f"Some {group_column} are missing {value_column}. Below are the number "
+        f"of unique {value_column} per {group_column}, which should be equal "
+        f"for all dates.\n{value_counts_per_group}"
     )
   else:
-    print("There are no duplicate items and dates, check passed.")
+    print(
+        f"All {group_column} have {value_counts_first_group:,} {value_column},"
+        " check passed."
+    )
 
 
 def validate_historical_data(
@@ -393,7 +419,8 @@ def validate_historical_data(
   The historical data is used to perform simulations to design the optimal
   experiment. This validates that:
 
-  - The item_ids + dates combinations are unique.
+  - All items have exactly 1 row for every date, there are no missing
+    date / item combinations or duplicates.
 
   Args:
     historical_data: The historical data to be validated.
@@ -404,6 +431,8 @@ def validate_historical_data(
     ValueError: If any of the validations fail.
   """
 
-  _validate_items_and_dates_are_unique(
-      historical_data, item_id_column=item_id_column, date_column=date_column
+  _validate_every_value_exists_exactly_once_for_every_group(
+      historical_data,
+      group_column=date_column,
+      value_column=item_id_column,
   )

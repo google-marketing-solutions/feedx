@@ -233,6 +233,19 @@ class DataValidationTests(parameterized.TestCase):
           date_column="date",
       )
 
+  def test_historical_data_must_have_every_item_and_date_combination(self):
+    bad_historical_data = pd.DataFrame({
+        "date": ["2023-10-01", "2023-10-01", "2023-10-02"],
+        "item_id": ["1", "2", "1"],
+    })
+
+    with self.assertRaises(ValueError):
+      data_preparation.validate_historical_data(
+          bad_historical_data,
+          item_id_column="item_id",
+          date_column="date",
+      )
+
 
 if __name__ == "__main__":
   absltest.main()
