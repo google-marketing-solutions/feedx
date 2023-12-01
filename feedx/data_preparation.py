@@ -424,15 +424,15 @@ def _validate_no_null_values(data: pd.DataFrame) -> None:
 
 
 def _validate_dates_are_either_daily_or_weekly(
-    data: pd.DataFrame, date_column: str
+    data: pd.DataFrame, date_column: str, date_id_column: str
 ) -> None:
-  """Validates that the dates are either daily or weekly spaced."""
+  """Validates that dates are daily or weekly spaced when sorted by date_id."""
   if not pd.api.types.is_datetime64_any_dtype(data[date_column]):
     raise ValueError(
         f"Date column must be datetime type, got {data[date_column].dtype}."
     )
 
-  unique_dates = data[date_column].drop_duplicates().sort_values()
+  unique_dates = data.sort_values(date_id_column)[date_column].drop_duplicates()
   days_between_dates = (
       (unique_dates - unique_dates.shift(1)).iloc[1:].dt.days.values
   )
@@ -559,7 +559,7 @@ def validate_historical_data(
       value_column=item_id_column,
   )
   _validate_dates_are_either_daily_or_weekly(
-      historical_data, date_column=date_column
+      historical_data, date_column=date_column, date_id_column=date_id_column
   )
   _validate_date_ids_are_consecutive_integers(historical_data, date_id_column)
   _validate_all_metrics_are_finite(

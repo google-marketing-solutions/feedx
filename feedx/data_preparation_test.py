@@ -316,6 +316,25 @@ class DataValidationTests(parameterized.TestCase):
           primary_metric_column="clicks",
       )
 
+  def test_historical_data_date_id_must_be_aligned_with_date(self):
+    bad_historical_data = pd.DataFrame({
+        "date": pd.to_datetime(
+            ["2023-10-01", "2023-10-01", "2023-10-03", "2023-10-03"]
+        ),
+        "date_id": [2, 2, 1, 1],
+        "item_id": ["1", "2", "1", "2"],
+        "clicks": [1, 2, 3, 4],
+    })
+
+    with self.assertRaises(ValueError):
+      data_preparation.validate_historical_data(
+          bad_historical_data,
+          item_id_column="item_id",
+          date_column="date",
+          date_id_column="date_id",
+          primary_metric_column="clicks",
+      )
+
   def test_historical_data_primary_metric_must_be_finite(self):
     bad_historical_data = pd.DataFrame({
         "date": pd.to_datetime(
