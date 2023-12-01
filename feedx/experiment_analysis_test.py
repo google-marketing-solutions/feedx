@@ -290,6 +290,30 @@ class ExperimentAnalysisTest(parameterized.TestCase):
 
     self.assertIsInstance(analysis_results, StatisticalTestResults)
 
+  @parameterized.parameters(False, True)
+  def test_analyze_experiment_does_not_mutate_original_dataframe(
+      self, is_crossover
+  ):
+    data = pd.DataFrame({
+        "treatment": [0] * 5 + [1] * 5,
+        "pretest": np.linspace(0, 1, 10),
+        "test": np.linspace(0, 1, 10),
+        "test_1": np.linspace(0, 1, 10),
+        "test_2": np.linspace(0.5, 1.5, 10),
+    })
+    original_data_copy = data.copy()
+
+    design = experiment_design.ExperimentDesign(
+        is_crossover=is_crossover,
+        post_trim_percentile=0.1,
+        pretest_weeks=4,
+        **self.irrelevant_design_args
+    )
+
+    experiment_analysis.analyze_experiment(data, design)
+
+    pd.testing.assert_frame_equal(data, original_data_copy)
+
 
 class PivotTimeAssignmentTest(parameterized.TestCase):
 

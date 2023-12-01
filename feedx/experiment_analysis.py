@@ -481,8 +481,8 @@ def _analyze_crossover_experiment(
 
   # Now adjust the mean again so that the adjusted control mean is the same
   # as the original control mean
-  y_control = y_1
-  y_control[is_treated_first] = y_2[is_treated_first]
+  y_control = y_1.copy()
+  y_control[is_treated_first] = y_2[is_treated_first].copy()
   adjustment_factor = y_control.mean() - y_control_demeaned.mean()
   y_control_demeaned += adjustment_factor
   y_treatment_demeaned += adjustment_factor
