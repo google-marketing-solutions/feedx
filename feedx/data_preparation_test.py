@@ -321,6 +321,42 @@ class DataValidationTests(parameterized.TestCase):
           primary_metric_column="clicks",
       )
 
+  def test_historical_data_metrics_must_be_non_negative_by_default(self):
+    bad_historical_data = pd.DataFrame({
+        "date": pd.to_datetime(
+            ["2023-10-01", "2023-10-01", "2023-10-02", "2023-10-02"]
+        ),
+        "item_id": ["1", "2", "1", "2"],
+        "clicks": [1, 2, 3, -1],
+    })
+
+    with self.assertRaises(ValueError):
+      data_preparation.validate_historical_data(
+          bad_historical_data,
+          item_id_column="item_id",
+          date_column="date",
+          primary_metric_column="clicks",
+      )
+
+  def test_historical_data_metrics_may_be_non_negative_if_require_positive_primary_metric_is_false(
+      self,
+  ):
+    good_historical_data = pd.DataFrame({
+        "date": pd.to_datetime(
+            ["2023-10-01", "2023-10-01", "2023-10-02", "2023-10-02"]
+        ),
+        "item_id": ["1", "2", "1", "2"],
+        "clicks": [1, 2, 3, -1],
+    })
+
+    data_preparation.validate_historical_data(
+        good_historical_data,
+        item_id_column="item_id",
+        date_column="date",
+        primary_metric_column="clicks",
+        require_positive_primary_metric=False,
+    )
+
 
 if __name__ == "__main__":
   absltest.main()

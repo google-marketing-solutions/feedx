@@ -467,11 +467,39 @@ def _validate_all_metrics_are_finite(
   )
 
 
+def _validate_all_metrics_are_positive(
+    data: pd.DataFrame, metric_columns: Collection[str], required: bool
+) -> None:
+  """Validates that all the metrics are positive."""
+  for metric_column in metric_columns:
+    invalid_metric_count = (data[metric_column] < 0).sum()
+
+    if invalid_metric_count:
+      if required:
+        raise ValueError(
+            f"There are {invalid_metric_count} negative values in"
+            f" {metric_column}. "
+        )
+      else:
+        print(
+            f"WARNING: There are {invalid_metric_count} negative values in"
+            f" {metric_column}. This will make it difficult to interpret "
+            "relative lift estimates."
+        )
+
+  if required:
+    print(
+        "The following metric values are all positive:"
+        f" {metric_columns}, check passed."
+    )
+
+
 def validate_historical_data(
     historical_data: pd.DataFrame,
     item_id_column: str,
     date_column: str,
     primary_metric_column: str,
+    require_positive_primary_metric: bool = True,
 ) -> None:
   """Runs all the required validation for the historical data.
 
@@ -485,12 +513,18 @@ def validate_historical_data(
   - All primary metric is finite. This is stricter than non-null as it ensures
     they are numeric and not infinite.
 
+  If require_positive_primary_metric is true, it also validates that the primary
+  metric is always positive or 0.
+
   Args:
     historical_data: The historical data to be validated.
     item_id_column: The column in the data contining the item identifier.
     date_column: The column in the data containing the date. This column must
       have a datetime type.
     primary_metric_column: The column containing the primary metric.
+    require_positive_primary_metric: Require that the primary metric is always
+      positive or 0. If set to False, it will check but not raise an exception
+      if there are negative metrics. Defaults to True.
 
   Raises:
     ValueError: If any of the validations fail.
@@ -507,4 +541,9 @@ def validate_historical_data(
   )
   _validate_all_metrics_are_finite(
       historical_data, metric_columns=[primary_metric_column]
+  )
+  _validate_all_metrics_are_positive(
+      historical_data,
+      metric_columns=[primary_metric_column],
+      required=require_positive_primary_metric,
   )
