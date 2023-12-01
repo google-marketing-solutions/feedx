@@ -14,8 +14,6 @@
 
 """Tests for data_preparation."""
 
-import io
-
 from absl.testing import absltest
 from absl.testing import parameterized
 import pandas as pd
@@ -33,18 +31,6 @@ class SyntheticDataTest(parameterized.TestCase):
         n_items=number_samples, historical_days=hist_days
     )
     self.assertEqual(len(data), number_samples * hist_days)
-
-
-class CsvDataTest(parameterized.TestCase):
-  def setUp(self):
-    super().setUp()
-    # TODO(sam-bailey): Fix read from csv data test, it is not testing anything.
-    self.csv_data = io.StringIO("""Shopping - Item ID
-                                "June 26, 2023 - October 1, 2023"
-                                Item ID,Week,Clicks,Impr.
-                                xxx,2023-08-07,0,0
-                                yyy,2023-08-21
-                                zzz,2023-08-14,0,0""")
 
 
 class StandardizeColumnNamesAndTypesTests(parameterized.TestCase):

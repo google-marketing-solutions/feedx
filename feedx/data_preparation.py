@@ -23,6 +23,14 @@ from typing import Callable
 import numpy as np
 import pandas as pd
 
+GOOGLE_ADS_PERFORMANCE_CSV_COLUMNS = {
+    "date_column": "Week",
+    "item_id_column": "Item ID",
+    "impressions_column": "Impr.",
+    "clicks_column": "Clicks",
+}
+GOOGLE_ADS_PERFORMANCE_READ_CSV_ARGS = {"header": 2, "thousands": ","}
+
 
 def generate_historical_synthetic_data(
     n_items: int = 7000,
@@ -112,49 +120,6 @@ def generate_historical_synthetic_data(
       "impressions": impressions.flatten(),
       "clicks": clicks.flatten(),
   })
-
-  return data
-
-
-def load_historical_data_from_csv(
-    file: str,
-    date_column_name: str = "Week",
-    product_id_column_name: str = "Item ID",
-    impressions_column_name: str = "Impr.",
-    clicks_column_name: str = "Clicks",
-) -> pd.DataFrame:
-  """Reads historical data from a csv file.
-
-  Specifically, it's designed to conform to format of "Shopping - Item ID"
-  Report provided by Google Ads GUI Columns are assumed to include: Week Start,
-  Item ID, Clicks and Impressions.
-
-  Args:
-    file: file to read CSV from (passed to Pandas)
-    date_column_name: name of week start column
-    product_id_column_name: name of Item ID column
-    impressions_column_name: contains impressions for product & week
-    clicks_column_name: contains clicks for product & week
-
-  Returns:
-    DataFrame containing the data.
-  """
-
-  data = pd.read_csv(file, header=2, thousands=",")
-  data = data[[
-      date_column_name,
-      product_id_column_name,
-      impressions_column_name,
-      clicks_column_name,
-  ]].rename(
-      {
-          date_column_name: "date",
-          product_id_column_name: "product_id",
-          impressions_column_name: "impressions",
-          clicks_column_name: "clicks",
-      },
-      axis=1,
-  )
 
   return data
 
