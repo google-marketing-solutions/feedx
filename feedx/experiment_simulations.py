@@ -385,6 +385,10 @@ class SimulationAnalysis:
       the A/A simulation p-values follow a uniform distribution. A statistically
       significant p-value indicates an invalid experiment. None if the
       validation has not been run.
+    false_positive_rate_robustness_p_value: A p-value testing the null
+      hypothesis that the simulated false positive rate of this experiment is
+      not more than the target design.alpha. A statistically significant p-value
+      indicates an invalid experiment. None if the validation has not been run.
     power_at_minimum_detectable_effect: The actual simulated power for the
       minimum detectable effect, should be close to design.power. None if the
       validation has not been run.
@@ -844,3 +848,22 @@ class SimulationAnalysis:
       return None
 
     return np.mean(self._aa_is_statistically_significant)
+
+  @property
+  def false_positive_rate_robustness_p_value(self) -> float | None:
+    """Returns a p-value testing that the false positive rate is valid.
+
+    We want to ensure that the false positive rate is not higher than the
+    specified design.alpha. This is done by using a binomial statistical test.
+
+    If the validate_design() method has not yet been run, this returns None.
+    """
+    if self.aa_simulation_results is None:
+      return None
+
+    return stats.binomtest(
+        k=np.sum(self._aa_is_statistically_significant),
+        n=len(self._aa_is_statistically_significant),
+        p=self.design.alpha,
+        alternative="greater",
+    ).pvalue
