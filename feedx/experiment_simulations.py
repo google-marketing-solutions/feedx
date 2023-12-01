@@ -20,6 +20,7 @@ import itertools
 
 import numpy as np
 import pandas as pd
+from scipy import stats
 import tqdm.autonotebook as tqdm
 
 from feedx import experiment_analysis
@@ -378,10 +379,12 @@ class SimulationAnalysis:
       estimate_minimum_detectable_effect has not been run.
     primary_metric_standard_deviation: The standard deviation of the primary
       metric. None if estimate_minimum_detectable_effect has not been run.
-    aa_robustness_pvalue: A p-value testing the null hypothesis that the A/A
-      simulation results are valid. None if the validation has not been run.
     ab_robustness_pvalue: A p-value testing the null hypothesis that the A/B
       simulation results are valid. None if the validation has not been run.
+    null_p_value_robustness_p_value: A p-value testing the null hypothesis that
+      the A/A simulation p-values follow a uniform distribution. A statistically
+      significant p-value indicates an invalid experiment. None if the
+      validation has not been run.
     power_at_minimum_detectable_effect: The actual simulated power for the
       minimum detectable effect, should be close to design.power. None if the
       validation has not been run.
@@ -416,9 +419,6 @@ class SimulationAnalysis:
       default=None, init=False
   )
 
-  aa_robustness_pvalue: float | None = dataclasses.field(
-      default=None, init=False
-  )
   ab_robustness_pvalue: float | None = dataclasses.field(
       default=None, init=False
   )
@@ -807,3 +807,19 @@ class SimulationAnalysis:
     self.ab_simulation_results = pd.DataFrame.from_records(
         map(dataclasses.asdict, ab_simulation_results_list)
     )
+
+  @property
+  def null_p_value_robustness_p_value(self) -> float | None:
+    """Returns a p-value testing that the A/A p-values are reliable.
+
+    Reliable p-values must follow a uniform distribution under the null
+    hypothesis (A/A tests). This uses a Kolmogorov–Smirnov test to test it.
+
+    If the validate_design() method has not yet been run, this returns None.
+    """
+    if self.aa_simulation_results is None:
+      return None
+
+    return stats.kstest(
+        self.aa_simulation_results["p_value"].values, stats.uniform.cdf
+    ).pvalue
