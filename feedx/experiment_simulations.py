@@ -1037,3 +1037,49 @@ class SimulationAnalysis:
       return None
     else:
       return all(robustness_checks)
+
+  def summary_dict(self) -> dict[str, str | int | float | bool | None]:
+    """Returns the main results as a dictionary.
+
+    The dictionary will contain:
+      - all of the paramters of the experiment design
+      - minimum_detectable_effect
+      - relative_minimum_detectable_effect
+      - simulated_false_positive_rate
+      - simulated_power_at_minimum_detectable_effect
+      - null_p_value_robustness_check_pass (True/False)
+      - power_robustness_check_pass (True/False)
+      - false_positive_rate_robustness_check_pass (True/False)
+      - aa_point_estimate_robustness_check_pass (True/False)
+      - ab_point_estimate_robustness_check_pass (True/False)
+      - all_robustness_checks_pass (True/False)
+
+    If estimate_minimum_detectable_effect() has not been run, then all of the
+    values that are not from the experiment design will be None.
+
+    If estimate_minimum_detectable_effect() has been run but
+    validate_experiment() has not, then everything except the design parameters,
+    minimum_detectable_effect and relative_minimum_detectable_effect will be
+    None.
+    """
+
+    summary_dict = dataclasses.asdict(self.design)
+    summary_dict["design_id"] = self.design.design_id
+
+    summary_metrics = [
+        "minimum_detectable_effect",
+        "relative_minimum_detectable_effect",
+        "simulated_false_positive_rate",
+        "simulated_power_at_minimum_detectable_effect",
+        "null_p_value_robustness_check_pass",
+        "power_robustness_check_pass",
+        "false_positive_rate_robustness_check_pass",
+        "aa_point_estimate_robustness_check_pass",
+        "ab_point_estimate_robustness_check_pass",
+        "all_robustness_checks_pass",
+    ]
+
+    for metric in summary_metrics:
+      summary_dict[metric] = getattr(self, metric)
+
+    return summary_dict

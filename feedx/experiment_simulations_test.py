@@ -100,7 +100,7 @@ class ExperimentSimulationsTest(parameterized.TestCase):
         candidate_pretest_weeks=[0, 1],
         candidate_pre_trim_percentiles=[0.0, 0.1],
         candidate_post_trim_percentiles=[0.025],
-        primary_metric='clicks',
+        primary_metric="clicks",
         crossover_washout_weeks=1,
     )
 
@@ -1330,6 +1330,124 @@ class SimulationAnalysisTests(parameterized.TestCase):
             rng=np.random.default_rng(0),
         )
         self.assertFalse(results.all_robustness_checks_pass)
+
+  def test_summay_dict_returns_dict_with_parameters_and_results(self):
+    design = ExperimentDesign(
+        n_items_before_trimming=60,
+        is_crossover=False,
+        runtime_weeks=6,
+        pretest_weeks=0,
+        pre_trim_top_percentile=0.0,
+        pre_trim_bottom_percentile=0.0,
+        post_trim_percentile=0.0,
+        primary_metric="clicks",
+    )
+
+    results = experiment_simulations.SimulationAnalysis(
+        design=design,
+        historical_data=self.big_historical_data,
+        minimum_start_week_id=0,
+        week_id_column="week_id",
+        item_id_column="item_id",
+        rng=np.random.default_rng(0),
+        robustness_p_value_threshold=0.1,
+    )
+    results.estimate_minimum_detectable_effect()
+    results.validate_design(n_simulations=5)
+
+    actual_summary_dict = results.summary_dict()
+    expected_summary_dict = {
+        "design_id": design.design_id,
+        "aa_point_estimate_robustness_check_pass": (
+            results.aa_point_estimate_robustness_check_pass
+        ),
+        "ab_point_estimate_robustness_check_pass": (
+            results.ab_point_estimate_robustness_check_pass
+        ),
+        "alpha": design.alpha,
+        "crossover_washout_weeks": design.crossover_washout_weeks,
+        "false_positive_rate_robustness_check_pass": (
+            results.false_positive_rate_robustness_check_pass
+        ),
+        "is_crossover": design.is_crossover,
+        "minimum_detectable_effect": results.minimum_detectable_effect,
+        "n_items_after_post_trim": design.n_items_after_post_trim,
+        "n_items_after_pre_trim": design.n_items_after_pre_trim,
+        "n_items_before_trimming": design.n_items_before_trimming,
+        "null_p_value_robustness_check_pass": (
+            results.null_p_value_robustness_check_pass
+        ),
+        "post_trim_percentile": design.post_trim_percentile,
+        "power": design.power,
+        "power_robustness_check_pass": results.power_robustness_check_pass,
+        "pre_trim_bottom_percentile": design.pre_trim_bottom_percentile,
+        "pre_trim_top_percentile": design.pre_trim_top_percentile,
+        "pretest_weeks": design.pretest_weeks,
+        "primary_metric": design.primary_metric,
+        "relative_minimum_detectable_effect": (
+            results.relative_minimum_detectable_effect
+        ),
+        "runtime_weeks": design.runtime_weeks,
+        "simulated_false_positive_rate": results.simulated_false_positive_rate,
+        "simulated_power_at_minimum_detectable_effect": (
+            results.simulated_power_at_minimum_detectable_effect
+        ),
+        "all_robustness_checks_pass": results.all_robustness_checks_pass,
+    }
+
+    self.assertDictEqual(actual_summary_dict, expected_summary_dict)
+
+  def test_summay_dict_results_are_none_if_not_calculated(self):
+    design = ExperimentDesign(
+        n_items_before_trimming=60,
+        is_crossover=False,
+        runtime_weeks=6,
+        pretest_weeks=0,
+        pre_trim_top_percentile=0.0,
+        pre_trim_bottom_percentile=0.0,
+        post_trim_percentile=0.0,
+        primary_metric="clicks",
+    )
+
+    results = experiment_simulations.SimulationAnalysis(
+        design=design,
+        historical_data=self.big_historical_data,
+        minimum_start_week_id=0,
+        week_id_column="week_id",
+        item_id_column="item_id",
+        rng=np.random.default_rng(0),
+        robustness_p_value_threshold=0.1,
+    )
+
+    actual_summary_dict = results.summary_dict()
+    expected_summary_dict = {
+        "design_id": design.design_id,
+        "aa_point_estimate_robustness_check_pass": None,
+        "ab_point_estimate_robustness_check_pass": None,
+        "alpha": design.alpha,
+        "crossover_washout_weeks": design.crossover_washout_weeks,
+        "false_positive_rate_robustness_check_pass": None,
+        "is_crossover": design.is_crossover,
+        "minimum_detectable_effect": None,
+        "n_items_after_post_trim": design.n_items_after_post_trim,
+        "n_items_after_pre_trim": design.n_items_after_pre_trim,
+        "n_items_before_trimming": design.n_items_before_trimming,
+        "null_p_value_robustness_check_pass": None,
+        "post_trim_percentile": design.post_trim_percentile,
+        "power": design.power,
+        "power_robustness_check_pass": None,
+        "pre_trim_bottom_percentile": design.pre_trim_bottom_percentile,
+        "pre_trim_top_percentile": design.pre_trim_top_percentile,
+        "pretest_weeks": design.pretest_weeks,
+        "primary_metric": design.primary_metric,
+        "relative_minimum_detectable_effect": None,
+        "runtime_weeks": design.runtime_weeks,
+        "simulated_false_positive_rate": None,
+        "simulated_power_at_minimum_detectable_effect": None,
+        "all_robustness_checks_pass": None,
+    }
+
+    self.assertDictEqual(actual_summary_dict, expected_summary_dict)
 
 
 if __name__ == "__main__":
