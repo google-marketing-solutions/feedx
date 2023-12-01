@@ -14,17 +14,19 @@
 
 """Tests for data_preparation."""
 
-import datetime as dt
 import io
-import unittest
 
+from absl.testing import absltest
+from absl.testing import parameterized
 import pandas as pd
+
 from feedx import data_preparation
 
 
-class SyntheticDataTest(unittest.TestCase):
+class SyntheticDataTest(parameterized.TestCase):
 
   def test_generate_historical_synthetic_data(self):
+    # TODO(sam-bailey): Improve synthetic data tests.
     number_samples = 500
     hist_days = 90
     data = data_preparation.generate_historical_synthetic_data(
@@ -33,9 +35,10 @@ class SyntheticDataTest(unittest.TestCase):
     self.assertEqual(len(data), number_samples * hist_days)
 
 
-class CsvDataTest(unittest.TestCase):
+class CsvDataTest(parameterized.TestCase):
   def setUp(self):
     super().setUp()
+    # TODO(sam-bailey): Fix read from csv data test, it is not testing anything.
     self.csv_data = io.StringIO("""Shopping - Item ID
                                 "June 26, 2023 - October 1, 2023"
                                 Item ID,Week,Clicks,Impr.
@@ -44,97 +47,95 @@ class CsvDataTest(unittest.TestCase):
                                 zzz,2023-08-14,0,0""")
 
 
-class StandardizeHistoricalDataTest(unittest.TestCase):
+class StandardizeColumnNamesAndTypesTests(parameterized.TestCase):
 
-  def test_standardize_historical_column_names(self):
-    values = [
-        ["ABC123", "2023-10-02", 2314, 324523],
-        ["XYZ987", "2023-10-01", 1, 10000],
-    ]
-    data_frame = pd.DataFrame(
-        values, columns=["item_id", "date", "clicks", "impressions"]
+  def setUp(self):
+    super().setUp()
+
+    self.data = pd.DataFrame({
+        "Item ID": [1, 2, 3],
+        "YYYY-MM-DD": ["2023-10-01", "2023-10-02", "2023-10-03"],
+        "Clicks": ["1", "2", "3"],
+        "Impr.": [20.0, 21.0, 22.0],
+        "Conv.": ["2", "3", "5"],
+        "Conv. Value": ["2.3", "4.2", "5.0"],
+        "Cost": [1, 2, 3],
+        "Some extra column": ["something", "something", "something"],
+    })
+
+  def test_standardize_column_names_and_types_standardizes_columns_as_expected(
+      self,
+  ):
+    parsed_data = data_preparation.standardize_column_names_and_types(
+        self.data,
+        item_id_column="Item ID",
+        date_column="YYYY-MM-DD",
+        clicks_column="Clicks",
+        impressions_column="Impr.",
+        conversions_column="Conv.",
+        total_conversion_value_column="Conv. Value",
+        total_cost_column="Cost",
     )
-    data = data_preparation.standardize_historical_column_names(
-        data_frame,
-        date_column_name=data_frame.columns[0],
-        item_id_column_name=data_frame.columns[1],
-        clicks_column_name=data_frame.columns[2],
-        impressions_column_name=data_frame.columns[3],
+    expected_data = pd.DataFrame({
+        "item_id": ["1", "2", "3"],
+        "date": [
+            pd.to_datetime("2023-10-01"),
+            pd.to_datetime("2023-10-02"),
+            pd.to_datetime("2023-10-03"),
+        ],
+        "clicks": [1, 2, 3],
+        "impressions": [20, 21, 22],
+        "conversions": [2, 3, 5],
+        "total_conversion_value": [2.3, 4.2, 5.0],
+        "total_cost": [1.0, 2.0, 3.0],
+    })
+    pd.testing.assert_frame_equal(parsed_data, expected_data, check_like=True)
+
+
+class FillMissingRowsWithZerosTests(parameterized.TestCase):
+
+  def setUp(self):
+    super().setUp()
+    # Input data is missing item 2 on 2023-10-02 and item 3 on 2023-10-01
+    self.input_data = pd.DataFrame({
+        "item_id": ["1", "1", "2", "3"],
+        "date": ["2023-10-01", "2023-10-02", "2023-10-01", "2023-10-02"],
+        "clicks": [1, 2, 3, 4],
+        "total_conversion_value": [20.0, 21.0, 22.0, 22.0],
+    })
+
+  def test_fill_missing_rows_with_zeros_adds_expected_missing_rows(self):
+    actual_result = data_preparation.fill_missing_rows_with_zeros(
+        self.input_data, item_id_column="item_id", date_column="date"
     )
-    self.assertIsInstance(data, pd.DataFrame)
-    self.assertCountEqual(
-        data.columns.values.tolist(),
-        ["item_id", "date", "clicks", "impressions"],
+
+    expected_result = pd.DataFrame({
+        "item_id": ["1", "1", "2", "2", "3", "3"],
+        "date": [
+            "2023-10-01",
+            "2023-10-02",
+            "2023-10-01",
+            "2023-10-02",
+            "2023-10-01",
+            "2023-10-02",
+        ],
+        "clicks": [1, 2, 3, 0, 0, 4],
+        "total_conversion_value": [20.0, 21.0, 22.0, 0.0, 0.0, 22.0],
+    })
+    pd.testing.assert_frame_equal(
+        actual_result, expected_result, check_like=True
     )
 
-
-class ParseDataTest(unittest.TestCase):
-
-  def test_historical_parse_data(self):
-    data_frame = pd.DataFrame([
-        {
-            "SKUs": "ABC123",
-            "dates": "2023-10-02",
-            "product_clicks": "2314",
-            "product_impressions": "324523",
-        },
-        {
-            "SKUs": "ABC123",
-            "dates": "2023-10-01",
-            "product_clicks": "0",
-            "product_impressions": "0",
-        },
-        {
-            "SKUs": "XYZ987",
-            "dates": "2023-10-02",
-            "product_clicks": "0",
-            "product_impressions": "0",
-        },
-        {
-            "SKUs": "XYZ987",
-            "dates": "2023-10-01",
-            "product_clicks": "1",
-            "product_impressions": "10000",
-        },
-    ])
-
-    columns_dict = {
-        "SKUs": "item_id",
-        "dates": "date",
-        "product_clicks": "clicks",
-        "product_impressions": "impressions"
-    }
-
-    expected_result = pd.DataFrame([
-        {
-            "item_id": "ABC123",
-            "date": dt.datetime(2023, 10, 2, 0, 0, 0),
-            "clicks": 2314,
-            "impressions": 324523,
-        },
-        {
-            "item_id": "ABC123",
-            "date": dt.datetime(2023, 10, 1, 0, 0, 0),
-            "clicks": 0,
-            "impressions": 0,
-        },
-        {
-            "item_id": "XYZ987",
-            "date": dt.datetime(2023, 10, 2, 0, 0, 0),
-            "clicks": 0,
-            "impressions": 0,
-        },
-        {
-            "item_id": "XYZ987",
-            "date": dt.datetime(2023, 10, 1, 0, 0, 0),
-            "clicks": 1,
-            "impressions": 10000,
-        },
-    ])
-    actual_result = data_preparation.parse_data(data_frame, columns_dict)
-
-    pd.testing.assert_frame_equal(actual_result, expected_result)
+  @parameterized.parameters(["item_id", "date"])
+  def test_fill_missing_rows_with_zeros_raises_exception_if_required_column_is_missing(
+      self, required_column_name
+  ):
+    self.input_data.drop(required_column_name, axis=1, inplace=True)
+    with self.assertRaises(ValueError):
+      data_preparation.fill_missing_rows_with_zeros(
+          self.input_data, item_id_column="item_id", date_column="date"
+      )
 
 
 if __name__ == "__main__":
-  unittest.main()
+  absltest.main()

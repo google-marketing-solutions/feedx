@@ -12,14 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Data preparation for FeedGen A/B Testing.
+"""Data preparation for FeedX.
 
-This file formats and validates data in preparation for A/B testing.
-Users can test with synthetic data or upload their product performance data.
+This module contains functions for loading and preparing the data required for
+FeedX.
 """
 
 import datetime as dt
-from typing import Dict
+from typing import Callable
 import numpy as np
 import pandas as pd
 
@@ -159,98 +159,187 @@ def load_historical_data_from_csv(
   return data
 
 
-def standardize_historical_column_names(
+def standardize_column_names_and_types(
     data: pd.DataFrame,
-    date_column_name: str,
-    item_id_column_name: str,
-    clicks_column_name: str,
-    impressions_column_name: str,
+    *,
+    item_id_column: str,
+    date_column: str,
+    clicks_column: str | None = None,
+    impressions_column: str | None = None,
+    total_cost_column: str | None = None,
+    conversions_column: str | None = None,
+    total_conversion_value_column: str | None = None,
+    custom_columns: dict[str, str] | None = None,
+    custom_parse_functions: (
+        dict[str, Callable[[pd.Series], pd.Series]] | None
+    ) = None,
 ) -> pd.DataFrame:
-  """Function to rename historical data columns.
+  """Standardizes the column names and types.
+
+  This renames the column names to their standardized names, casts the columns
+  to a standardized data type, and drops any other columns. The item_id and
+  date columns are requied, but all others are optional. However typically at
+  least one other metric column is needed downstream.
+
+  The custom_columns and custom_parse_functions are there to allow the user to
+  include their own custom metrics, but they should not overlap the standard
+  columns.
 
   Args:
     data: synthetic, historical, or runtime data
-    date_column_name: name of week start column
-    item_id_column_name: name of Item ID column
-    clicks_column_name: contains clicks for product & week
-    impressions_column_name: contains impressions for product & week
+    item_id_column: The name of the column containing the unique identifier of
+      the item in data.
+    date_column: The name of the date column in data.
+    clicks_column: The name of the clicks column in data if it exists, otherwise
+      None. Defaults to None.
+    impressions_column: The name of the impressions column in data if it exists,
+      otherwise None. Defaults to None.
+    total_cost_column: The name of the column containing the total cost (spend)
+      in data if it exists, otherwise None. Defaults to None.
+    conversions_column: The name of the conversions column in data if it exists,
+      otherwise None. Defaults to None.
+    total_conversion_value_column: The name of the column containing the total
+      conversion value in data if it exists, otherwise None. Defaults to None.
+    custom_columns: Key value pairs, where the key is the output column name and
+      the value is the input column name, for any extra columns that have not
+      already been specified.
+    custom_parse_functions: Optionally, a dictionary containing functions to
+      cast the custom columns to the correct data type. The keys are the
+      standard column names, and the values are the functions which should take
+      as an input a pandas series and return a pandas series.
 
   Returns:
-    Dataframe with standardized column names.
-  """
-  data = data[[
-      date_column_name,
-      item_id_column_name,
-      clicks_column_name,
-      impressions_column_name,
-  ]].rename(
-      {
-          date_column_name: "date",
-          item_id_column_name: "item_id",
-          clicks_column_name: "clicks",
-          impressions_column_name: "impressions",
-      },
-      axis=1,
-  )
+    Dataframe with standardized column names and types.
 
-  return data
-
-
-def parse_data(
-    data: pd.DataFrame,
-    columns: Dict[str, str]
-    ) -> pd.DataFrame:
-  """Format the loaded data.
-
-  Assign data types to user-provided data and remove duplicates.
-
-  Args:
-    data: synthetic, historical, or runtime data
-    columns: columns provided in the data sets that contain date, item_id, and
-      metrics such as clicks, impressions, and conversions. Not all users will
-      provide the same set of metrics, so this argument is intended to pass
-      what is provided and apply the corresponding formatting. The keys of the 
-      dict are the names of the input columns and their values are the 
-      standardized output column names
-
-  Returns:
-    Data columns in specified data type with duplicates removed.
-  
   Raises:
-  ValueError: If the value of `output_column` is not valid.
-  ValueError: If the value of `input_column` is not valid.
+    ValueError: If any of the custom columns overlap with the standard columns,
+      or if any of the custom_parse_functions don't exist in the custom columns.
+    ValueError: If the data does not contain the required columns.
   """
+  custom_columns = custom_columns or {}
+  custom_parse_functions = custom_parse_functions or {}
 
-  _parse_function = {
+  parse_functions = {
       "item_id": lambda x: x.astype(str),
-      "date": lambda x: pd.to_datetime(x),
+      "date": pd.to_datetime,
       "clicks": lambda x: pd.to_numeric(x).astype(int),
       "impressions": lambda x: pd.to_numeric(x).astype(int),
       "total_cost": lambda x: pd.to_numeric(x).astype(float),
       "conversions": lambda x: pd.to_numeric(x).astype(int),
-      "total_conversion_value": lambda x: pd.to_numeric(x).astype(float)
+      "total_conversion_value": lambda x: pd.to_numeric(x).astype(float),
+  }
+  column_names = {
+      "item_id": item_id_column,
+      "date": date_column,
+      "clicks": clicks_column,
+      "impressions": impressions_column,
+      "total_cost": total_cost_column,
+      "conversions": conversions_column,
+      "total_conversion_value": total_conversion_value_column,
   }
 
-  for output_column in columns.values():
-    if output_column not in _parse_function.keys():
-      raise ValueError(f"The output column {output_column} is not expected.")
+  for custom_column in custom_columns.keys():
+    if custom_column in column_names.keys():
+      raise ValueError(
+          f"The custom column {custom_column} is one of the standard columns,"
+          f" set it with the {custom_column}_column argument."
+      )
 
-  for input_column in columns.keys():
+  for custom_parse_function in custom_parse_functions.keys():
+    if custom_parse_function in parse_functions.keys():
+      raise ValueError(
+          f"The custom parse function {custom_parse_function} is one of the"
+          " standard parse functions, no need to set it."
+      )
+    if custom_parse_function not in custom_columns.keys():
+      raise ValueError(
+          f"The custom parse function {custom_parse_function} must also be set"
+          " in custom_columns."
+      )
+
+  parse_functions = parse_functions | custom_parse_functions
+  column_names = column_names | custom_columns
+
+  column_names = {
+      parsed_name: input_name
+      for parsed_name, input_name in column_names.items()
+      if input_name is not None
+  }
+  parse_functions = {
+      parsed_name: function
+      for parsed_name, function in parse_functions.items()
+      if parsed_name in column_names.keys()
+  }
+  column_renamer = {
+      input_name: parsed_name
+      for parsed_name, input_name in column_names.items()
+  }
+
+  for input_column in column_names.values():
     if input_column not in data.columns:
       raise ValueError(
-          f"The input column {input_column} does not exist in the data.")
+          f"The input column {input_column} does not exist in the data."
+      )
 
-  output_data = data[list(columns.keys())]
-  output_data.rename(columns, axis=1, inplace=True)
+  output_data = data[list(column_names.values())].copy()
+  output_data.rename(column_renamer, axis=1, inplace=True)
 
   for column in output_data.columns:
-    output_data[column] = _parse_function[column](output_data[column])
+    parse_function = parse_functions.get(column, lambda x: x)
+    output_data[column] = parse_function(output_data[column])
 
-  all_products = output_data[["item_id"]].drop_duplicates()
-  all_dates = output_data[["date"]].drop_duplicates()
-  all_product_date_combinations = all_products.merge(all_dates, how="cross")
+  return output_data
 
-  data = all_product_date_combinations.merge(
-      output_data, on=["item_id", "date"], how="left").fillna(0)
 
-  return data
+def fill_missing_rows_with_zeros(
+    data: pd.DataFrame,
+    item_id_column: str = "item_id",
+    date_column: str = "date",
+) -> pd.DataFrame:
+  """Adds any missing rows in the dataframe with zeros.
+
+  Often the input data is missing the rows where the item got 0 for all the
+  metrics. However, this will break some of the analysis functions, so this
+  function makes sure that there is at least one row for every unique
+  combination of item_id and date.
+
+  Args:
+    data: synthetic, historical, or runtime data
+    item_id_column: The column name containing the item id. Defaults to
+      "item_id".
+    date_column: The column name containing the date. Defaults to "date".
+
+  Returns:
+    Data columns in specified data type with missing date / item_id combinations
+    filled with zeros.
+
+  Raises:
+    ValueError: If the item_id_column or date_column do not exist in the data.
+  """
+  required_columns = {item_id_column, date_column}
+  missing_columns = required_columns - set(data.columns.values)
+  if missing_columns:
+    raise ValueError(
+        "The data is missing the following required columns: "
+        f"{missing_columns}."
+    )
+
+  all_items = data[[item_id_column]].drop_duplicates()
+  all_dates = data[[date_column]].drop_duplicates()
+  all_item_date_combinations = all_items.merge(all_dates, how="cross")
+  output_data = all_item_date_combinations.merge(
+      data, on=[item_id_column, date_column], how="left"
+  )
+
+  metric_columns = [
+      column
+      for column in output_data.columns
+      if column not in [date_column, item_id_column]
+  ]
+  for metric_column in metric_columns:
+    original_dtype = data[metric_column].dtype
+    output_data[metric_column] = (
+        output_data[metric_column].fillna(0).astype(original_dtype)
+    )
+
+  return output_data
