@@ -1091,3 +1091,23 @@ class SimulationAnalysis:
       summary_dict[metric] = getattr(self, metric)
 
     return summary_dict
+
+
+def make_analysis_summary_dataframe(
+    experiment_analyses: Collection[SimulationAnalysis],
+    sort_by: str = "relative_minimum_detectable_effect",
+) -> pd.DataFrame:
+  """Returns a dataframe summarising a list of simulation analysis results.
+
+  Args:
+    experiment_analyses: The list of experiment analyses.
+    sort_by: The column to sort the resulting dataframe by. Defaults to the
+      relative_minimum_detectable_effect.
+  """
+  return (
+      pd.DataFrame.from_records(
+          list(map(lambda x: x.summary_dict(), experiment_analyses))
+      )
+      .set_index("design_id")
+      .sort_values(sort_by)
+  )

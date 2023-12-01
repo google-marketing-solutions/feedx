@@ -1505,5 +1505,114 @@ class SimulationAnalysisTests(parameterized.TestCase):
     self.assertDictEqual(actual_summary_dict, expected_summary_dict)
 
 
+class SummaryDataframeTests(parameterized.TestCase):
+
+  def setUp(self):
+    super().setUp()
+
+    rng = np.random.default_rng(0)
+    self.historical_data = pd.DataFrame({
+        "item_id": list(range(60)) * 6,
+        "week_id": sorted(list(range(6)) * 60),
+        "clicks": rng.integers(0, 10, 60 * 6),
+    })
+
+  def test_make_analysis_summary_dataframe_returns_expected_columns(self):
+    design = ExperimentDesign(
+        n_items_before_trimming=60,
+        is_crossover=False,
+        runtime_weeks=6,
+        pretest_weeks=0,
+        pre_trim_top_percentile=0.0,
+        pre_trim_bottom_percentile=0.0,
+        post_trim_percentile=0.0,
+        primary_metric="clicks",
+    )
+
+    analysis = experiment_simulations.SimulationAnalysis(
+        design,
+        self.historical_data,
+        item_id_column="item_id",
+        week_id_column="week_id",
+        minimum_start_week_id=0,
+        rng=np.random.default_rng(0),
+    )
+    analysis.estimate_minimum_detectable_effect()
+    analysis.validate_design(n_simulations=5)
+
+    summary_data = experiment_simulations.make_analysis_summary_dataframe(
+        [analysis]
+    )
+
+    expected_columns = [
+        "n_items_before_trimming",
+        "runtime_weeks",
+        "primary_metric",
+        "pretest_weeks",
+        "is_crossover",
+        "pre_trim_top_percentile",
+        "pre_trim_bottom_percentile",
+        "post_trim_percentile",
+        "crossover_washout_weeks",
+        "alpha",
+        "power",
+        "n_items_after_pre_trim",
+        "n_items_after_post_trim",
+        "minimum_detectable_effect",
+        "relative_minimum_detectable_effect",
+        "simulated_false_positive_rate",
+        "simulated_power_at_minimum_detectable_effect",
+        "null_p_value_robustness_check_pass",
+        "power_robustness_check_pass",
+        "false_positive_rate_robustness_check_pass",
+        "aa_point_estimate_robustness_check_pass",
+        "ab_point_estimate_robustness_check_pass",
+        "all_robustness_checks_pass",
+    ]
+    self.assertCountEqual(summary_data.columns, expected_columns)
+
+  @parameterized.parameters(
+      "relative_minimum_detectable_effect",
+      "minimum_detectable_effect",
+      "runtime_weeks",
+  )
+  def test_make_analysis_dataframe_sorts_by_sort_by_column(
+      self, sort_by_column
+  ):
+    analyses = []
+    for runtime_weeks in range(1, 6):
+      design = ExperimentDesign(
+          n_items_before_trimming=60,
+          is_crossover=False,
+          runtime_weeks=runtime_weeks,
+          pretest_weeks=0,
+          pre_trim_top_percentile=0.0,
+          pre_trim_bottom_percentile=0.0,
+          post_trim_percentile=0.0,
+          primary_metric="clicks",
+      )
+      analysis = experiment_simulations.SimulationAnalysis(
+          design,
+          self.historical_data.copy(),
+          item_id_column="item_id",
+          week_id_column="week_id",
+          minimum_start_week_id=0,
+          rng=np.random.default_rng(0),
+      )
+      analysis.estimate_minimum_detectable_effect()
+      analysis.validate_design(n_simulations=5)
+      analyses.append(analysis)
+
+    summary_data = experiment_simulations.make_analysis_summary_dataframe(
+        analyses, sort_by=sort_by_column
+    )
+
+    correctly_sorted_summary_data = summary_data.sort_values(by=sort_by_column)
+
+    pd.testing.assert_index_equal(
+        summary_data.index, correctly_sorted_summary_data.index
+    )
+
+
 if __name__ == "__main__":
   absltest.main()
