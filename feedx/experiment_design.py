@@ -311,3 +311,94 @@ def trim_outliers(
   )
 
   return data.loc[(rank > min_rank) & (rank <= max_rank)].copy()
+
+
+def perform_treatment_assignment(
+    historical_data: pd.DataFrame,
+    *,
+    design: ExperimentDesign,
+    rng: np.random.Generator,
+    item_id_column: str,
+    week_id_column: str,
+    treatment_assignment_column: str = "treatment_assignment",
+) -> pd.DataFrame:
+  """Returns the items for the experiment with their treatment assignment.
+
+  This function performs the pre-test trimming if specified in the experiment
+  design, using the most recent weeks in the historical data for the pre-test
+  weeks.
+
+  Then, with the final set of items, it randomises them into control (0)
+  or treatment (1) using a coinflip. The salt from the coinflip is taken
+  from the experiment design if it exists, and otherwise a random salt is
+  generated and added to the design.
+
+  Args:
+    historical_data: The historical data to use to get the items and perform the
+      trimming.
+    design: The experiment design.
+    rng: The random number generator, used to break ties in the trimming.
+    item_id_column: The name of the column in historical_data containing the
+      item identifier.
+    week_id_column: The name of the column in historical_data containing the
+      week identifier.
+    treatment_assignment_column: The name of the output column that will contain
+      the treatment assignment. Defaults to "treatment_assignment".
+
+  Returns:
+    A dataframe containing the item_ids selected for the experiment (after
+    pre-trimming), and the treatment assignment generated from the item id and
+    coinflip salt.
+
+  Raises:
+    ValueError: If the item_id_column or week_id_column are not in the
+      historical_data, or if the treatment_assignment_column is the same as the
+      item_id_column.
+  """
+
+  required_columns = {item_id_column, week_id_column}
+  missing_columns = required_columns - set(historical_data.columns)
+  if missing_columns:
+    raise ValueError(
+        "The historical_data is missing the following required columns: "
+        f"{missing_columns}"
+    )
+
+  if item_id_column == treatment_assignment_column:
+    raise ValueError(
+        "The treatment_assignment_column must not be the same as the"
+        f" item_id_column, both are '{item_id_column}'."
+    )
+
+  if design.coinflip_salt:
+    coinflip = Coinflip(design.coinflip_salt)
+    print(f"Using coinflip salt from design: {coinflip.salt}")
+  else:
+    coinflip = Coinflip.with_random_salt()
+    design.coinflip_salt = coinflip.salt
+    print(f"Generating random coinflip salt: {coinflip.salt}")
+
+  max_week_id = historical_data[week_id_column].max()
+  start_week_id = max_week_id - design.pretest_weeks
+  pretest_data = historical_data.loc[
+      historical_data[week_id_column] > start_week_id
+  ].copy()
+  pretest_items = (
+      pretest_data.groupby(item_id_column)[design.primary_metric]
+      .sum()
+      .reset_index()
+  )
+
+  experiment_items = trim_outliers(
+      pretest_items,
+      order_by=design.primary_metric,
+      trim_percentile_bottom=design.pre_trim_bottom_percentile,
+      trim_percentile_top=design.pre_trim_top_percentile,
+      rng=rng,
+  )[[item_id_column]]
+
+  experiment_items[treatment_assignment_column] = experiment_items[
+      item_id_column
+  ].apply(coinflip)
+
+  return experiment_items
