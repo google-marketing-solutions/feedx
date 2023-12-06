@@ -491,5 +491,145 @@ class DataValidationTests(parameterized.TestCase):
       )
 
 
+class GroupDataToWeekly(parameterized.TestCase):
+  def test_group_daily_data_to_weekly(self):
+    values = [
+        ["ABC123", "2023-10-01", 1, 10000],
+        ["ABC123", "2023-10-02", 50, 500],
+        ["ABC123", "2023-10-03", 100, 3245234],
+        ["ABC123", "2023-10-04", 435, 353245],
+        ["ABC123", "2023-10-05", 123, 3245],
+        ["ABC123", "2023-10-06", 35, 2],
+        ["ABC123", "2023-10-07", 25, 325],
+        ["ABC123", "2023-10-08", 34, 354],
+    ]
+    daily_data = pd.DataFrame(
+        values, columns=["item_id", "date", "clicks", "impressions"]
+    )
+
+    daily_data = data_preparation.standardize_column_names_and_types(
+        data=daily_data,
+        item_id_column="item_id",
+        date_column="date",
+        clicks_column="clicks",
+        impressions_column="impressions")
+
+    expected_daily_result = pd.DataFrame([{
+        "week_number": 0,
+        "item_id": "ABC123",
+        "clicks": 769,
+        "impressions": 3612551,
+        "week_start": "2023-10-01",
+    }])
+    expected_daily_result["week_start"] = pd.to_datetime(
+        expected_daily_result["week_start"]
+    )
+    actual_daily_result = (
+        data_preparation.group_daily_to_complete_weekly_with_week_numbers(
+            daily_data,
+            item_id_column="item_id",
+            date_column="date",
+            week_number_column="week_number",
+            week_start_column="week_start",
+        )
+    )
+    pd.testing.assert_frame_equal(actual_daily_result, expected_daily_result)
+
+  def test_group_weekly_data_to_weekly(self):
+    values = [
+        ["ABC123", "2023-10-01", 1, 10000],
+        ["ABC123", "2023-10-08", 50, 500],
+        ["ABC123", "2023-10-15", 100, 3245234],
+        ["ABC123", "2023-10-22", 435, 353245],
+    ]
+    weekly_data = pd.DataFrame(
+        values, columns=["item_id", "date", "clicks", "impressions"]
+    )
+
+    weekly_data = data_preparation.standardize_column_names_and_types(
+        data=weekly_data,
+        item_id_column="item_id",
+        date_column="date",
+        clicks_column="clicks",
+        impressions_column="impressions")
+    expected_weekly_result = pd.DataFrame([
+        {
+            "item_id": "ABC123",
+            "week_start": "2023-10-01",
+            "clicks": 1,
+            "impressions": 10000,
+            "week_number": 0,
+        },
+        {
+            "item_id": "ABC123",
+            "week_start": "2023-10-08",
+            "clicks": 50,
+            "impressions": 500,
+            "week_number": 1,
+        },
+        {
+            "item_id": "ABC123",
+            "week_start": "2023-10-15",
+            "clicks": 100,
+            "impressions": 3245234,
+            "week_number": 2,
+        },
+        {
+            "item_id": "ABC123",
+            "week_start": "2023-10-22",
+            "clicks": 435,
+            "impressions": 353245,
+            "week_number": 3,
+        },
+    ])
+    expected_weekly_result["week_start"] = pd.to_datetime(
+        expected_weekly_result["week_start"])
+
+    actual_weekly_result = (
+        data_preparation.group_daily_to_complete_weekly_with_week_numbers(
+            weekly_data,
+            item_id_column="item_id",
+            date_column="date",
+            week_number_column="week_number",
+            week_start_column="week_start",
+        )
+    )
+    pd.testing.assert_frame_equal(actual_weekly_result, expected_weekly_result)
+
+  def test_group_mixed_data_to_weekly_raises_exception_if_mixed_frequency(self):
+    values = [
+        ["ABC123", "2023-10-01", 1, 10000],
+        ["ABC123", "2023-10-08", 50, 500],
+        ["ABC123", "2023-10-15", 100, 3245234],
+        ["ABC123", "2023-10-22", 435, 353245],
+        ["ABC123", "2023-10-02", 50, 500],
+        ["ABC123", "2023-10-03", 100, 3245234],
+        ["ABC123", "2023-10-04", 435, 353245],
+        ["ABC123", "2023-10-05", 123, 3245],
+        ["ABC123", "2023-10-06", 35, 2],
+        ["ABC123", "2023-10-07", 25, 325],
+    ]
+    mixed_data = pd.DataFrame(
+        values, columns=["item_id", "date", "clicks", "impressions"]
+    )
+
+    mixed_data = data_preparation.standardize_column_names_and_types(
+        data=mixed_data,
+        item_id_column="item_id",
+        date_column="date",
+        clicks_column="clicks",
+        impressions_column="impressions")
+
+    with self.assertRaisesRegex(
+        ValueError,
+        "The data is not daily or weekly. Cannot proceed with mixed frequency",
+    ):
+      data_preparation.group_daily_to_complete_weekly_with_week_numbers(
+          mixed_data,
+          item_id_column="item_id",
+          date_column="date",
+          week_number_column="week_number",
+          week_start_column="week_start",
+      )
 if __name__ == "__main__":
   absltest.main()
