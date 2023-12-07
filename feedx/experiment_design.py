@@ -147,7 +147,7 @@ class ExperimentDesign:
   def design_id(self) -> str:
     """Returns a unique identifier for the design."""
 
-    return hashlib.md5(str(self).encode("utf-8")).hexdigest()
+    return hashlib.md5(repr(self).encode("utf-8")).hexdigest()
 
   @classmethod
   def load_from_yaml(cls, file_path: str) -> "ExperimentDesign":
@@ -197,6 +197,108 @@ class ExperimentDesign:
     raw_values = dataclasses.asdict(self)
     with open(file_path, "w") as file:
       yaml.dump(raw_values, file)
+
+  def __str__(self) -> str:
+    if self.is_crossover:
+      experiment_type = "crossover experiment"
+    elif self.pretest_weeks > 0:
+      experiment_type = "regular experiment (CUPED adjusted)"
+    else:
+      experiment_type = "regular experiment"
+
+    lines = [
+        f"Design {self.design_id}",
+        "",
+        f"\tExperiment type: {experiment_type}",
+        f"\tPrimary metric: {self.primary_metric}",
+        (
+            "\tNumber of weeks of data before start of experiment used for"
+            f" analysis: {self.pretest_weeks}"
+        ),
+        f"\tTotal experiment runtime weeks: {self.runtime_weeks}",
+    ]
+    if self.is_crossover:
+      washout_weeks = list(range(1, self.crossover_washout_weeks + 1)) + list(
+          range(
+              self.runtime_weeks // 2 + 1,
+              self.runtime_weeks // 2 + self.crossover_washout_weeks + 1,
+          )
+      )
+      lines.extend([
+          "",
+          "Crossover Details:",
+          "",
+          (
+              "\tControl and treatment to be swapped"
+              f" {self.runtime_weeks // 2} weeks after starting the"
+              " experiment"
+          ),
+          (
+              "\tNumber of crossover washout weeks to ignore at start of"
+              f" each period: {self.crossover_washout_weeks}"
+          ),
+          (
+              f"\tWeeks {washout_weeks} are the washout weeks to be"
+              " excluded from the analysis"
+          ),
+      ])
+
+    lines.extend([
+        "",
+        "Number of items for testing:",
+        "",
+    ])
+    if self.n_items_before_trimming == self.n_items_after_post_trim:
+      lines.extend([
+          f"\tNumber of items: {self.n_items_before_trimming}",
+          "\tNo hero / outlier trimming used",
+      ])
+    else:
+      lines.append(
+          "\tNumber of items eligible for experimentation (before trimming):"
+          f" {self.n_items_before_trimming}"
+      )
+      if self.n_items_after_pre_trim < self.n_items_before_trimming:
+        lines.append("")
+        if self.pre_trim_top_percentile > 0:
+          lines.append(
+              f"\tTop {self.pre_trim_top_percentile:.2%} of items with highest"
+              f" {self.primary_metric} in pre-test period will not be included"
+              " in experiment"
+          )
+        if self.pre_trim_bottom_percentile > 0:
+          lines.append(
+              f"\tBottom {self.pre_trim_bottom_percentile:.2%} items with"
+              f" lowest {self.primary_metric} in pre-test period will not be"
+              " included in experiment"
+          )
+        lines.append(
+            "\tNumber of items remaining after trimming for the experiment:"
+            f" {self.n_items_after_pre_trim}"
+        )
+      if self.n_items_after_post_trim < self.n_items_after_pre_trim:
+        lines.extend([
+            "",
+            (
+                f"\tTop and bottom {self.post_trim_percentile:.2%} of items"
+                f" with highest / lowest {self.primary_metric} during"
+                " experiment runtime will be excluded from the analysis"
+            ),
+            (
+                "\tNumber of items remaining after trimming for the"
+                f" analysis: {self.n_items_after_post_trim}"
+            ),
+        ])
+
+    lines.extend([
+        "",
+        "Extra details:",
+        "",
+        f"\tAlpha threshold: {self.alpha}",
+        f"\tPower: {self.power}",
+        f"\tCoinflip salt: {self.coinflip_salt}",
+    ])
+    return "\n".join(lines)
 
 
 class Coinflip:

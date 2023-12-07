@@ -322,6 +322,293 @@ class ExperimentDesignTest(parameterized.TestCase):
     with self.assertRaises(ValueError):
       ExperimentDesign.load_from_yaml(yaml_file.full_path)
 
+  def test_prints_expected_string_for_crossover(self):
+    design = ExperimentDesign(
+        n_items_before_trimming=1000,
+        runtime_weeks=8,
+        primary_metric="clicks",
+        pretest_weeks=4,
+        is_crossover=True,
+        pre_trim_top_percentile=0.0,
+        pre_trim_bottom_percentile=0.0,
+        post_trim_percentile=0.0,
+        crossover_washout_weeks=2,
+        alpha=0.05,
+        power=0.8,
+    )
+
+    expected_string = "\n".join([
+        "Design 1107a82030639088175ba76cab781121",
+        "",
+        "\tExperiment type: crossover experiment",
+        "\tPrimary metric: clicks",
+        (
+            "\tNumber of weeks of data before start of experiment used for"
+            " analysis: 4"
+        ),
+        "\tTotal experiment runtime weeks: 8",
+        "",
+        "Crossover Details:",
+        "",
+        (
+            "\tControl and treatment to be swapped 4 weeks after starting the"
+            " experiment"
+        ),
+        (
+            "\tNumber of crossover washout weeks to ignore at start of each"
+            " period: 2"
+        ),
+        (
+            "\tWeeks [1, 2, 5, 6] are the washout weeks to be excluded from the"
+            " analysis"
+        ),
+        "",
+        "Number of items for testing:",
+        "",
+        "\tNumber of items: 1000",
+        "\tNo hero / outlier trimming used",
+        "",
+        "Extra details:",
+        "",
+        "\tAlpha threshold: 0.05",
+        "\tPower: 0.8",
+        "\tCoinflip salt: None",
+    ])
+    self.assertEqual(str(design), expected_string)
+
+  def test_prints_expected_string_for_non_crossover_with_cuped(self):
+    design = ExperimentDesign(
+        n_items_before_trimming=1000,
+        runtime_weeks=8,
+        primary_metric="clicks",
+        pretest_weeks=4,
+        is_crossover=False,
+        pre_trim_top_percentile=0.0,
+        pre_trim_bottom_percentile=0.0,
+        post_trim_percentile=0.0,
+        crossover_washout_weeks=2,
+        alpha=0.05,
+        power=0.8,
+    )
+
+    expected_string = "\n".join([
+        "Design 0e4192ad17f4685470ad26e49ee5c45d",
+        "",
+        "\tExperiment type: regular experiment (CUPED adjusted)",
+        "\tPrimary metric: clicks",
+        (
+            "\tNumber of weeks of data before start of experiment used for"
+            " analysis: 4"
+        ),
+        "\tTotal experiment runtime weeks: 8",
+        "",
+        "Number of items for testing:",
+        "",
+        "\tNumber of items: 1000",
+        "\tNo hero / outlier trimming used",
+        "",
+        "Extra details:",
+        "",
+        "\tAlpha threshold: 0.05",
+        "\tPower: 0.8",
+        "\tCoinflip salt: None",
+    ])
+    self.assertEqual(str(design), expected_string)
+
+  def test_prints_expected_string_for_non_crossover_without_cuped(self):
+    design = ExperimentDesign(
+        n_items_before_trimming=1000,
+        runtime_weeks=8,
+        primary_metric="clicks",
+        pretest_weeks=0,
+        is_crossover=False,
+        pre_trim_top_percentile=0.0,
+        pre_trim_bottom_percentile=0.0,
+        post_trim_percentile=0.0,
+        crossover_washout_weeks=2,
+        alpha=0.05,
+        power=0.8,
+    )
+
+    expected_string = "\n".join([
+        "Design 516f3ecd3bf14622f9962912aefbe791",
+        "",
+        "\tExperiment type: regular experiment",
+        "\tPrimary metric: clicks",
+        (
+            "\tNumber of weeks of data before start of experiment used for"
+            " analysis: 0"
+        ),
+        "\tTotal experiment runtime weeks: 8",
+        "",
+        "Number of items for testing:",
+        "",
+        "\tNumber of items: 1000",
+        "\tNo hero / outlier trimming used",
+        "",
+        "Extra details:",
+        "",
+        "\tAlpha threshold: 0.05",
+        "\tPower: 0.8",
+        "\tCoinflip salt: None",
+    ])
+    self.assertEqual(str(design), expected_string)
+
+  def test_prints_expected_string_with_pre_trimming(self):
+    design = ExperimentDesign(
+        n_items_before_trimming=1000,
+        runtime_weeks=8,
+        primary_metric="clicks",
+        pretest_weeks=4,
+        is_crossover=False,
+        pre_trim_top_percentile=0.01,
+        pre_trim_bottom_percentile=0.02,
+        post_trim_percentile=0.0,
+        crossover_washout_weeks=2,
+        alpha=0.05,
+        power=0.8,
+    )
+
+    expected_string = "\n".join([
+        "Design f4258976a05e23a2153208f76cbf0920",
+        "",
+        "\tExperiment type: regular experiment (CUPED adjusted)",
+        "\tPrimary metric: clicks",
+        (
+            "\tNumber of weeks of data before start of experiment used for"
+            " analysis: 4"
+        ),
+        "\tTotal experiment runtime weeks: 8",
+        "",
+        "Number of items for testing:",
+        "",
+        (
+            "\tNumber of items eligible for experimentation (before trimming):"
+            " 1000"
+        ),
+        "",
+        (
+            "\tTop 1.00% of items with highest clicks in pre-test period will"
+            " not be included in experiment"
+        ),
+        (
+            "\tBottom 2.00% items with lowest clicks in pre-test period will"
+            " not be included in experiment"
+        ),
+        "\tNumber of items remaining after trimming for the experiment: 970",
+        "",
+        "Extra details:",
+        "",
+        "\tAlpha threshold: 0.05",
+        "\tPower: 0.8",
+        "\tCoinflip salt: None",
+    ])
+    self.assertEqual(str(design), expected_string)
+
+  def test_prints_expected_string_with_post_trimming(self):
+    design = ExperimentDesign(
+        n_items_before_trimming=1000,
+        runtime_weeks=8,
+        primary_metric="clicks",
+        pretest_weeks=4,
+        is_crossover=False,
+        pre_trim_top_percentile=0.0,
+        pre_trim_bottom_percentile=0.0,
+        post_trim_percentile=0.01,
+        crossover_washout_weeks=2,
+        alpha=0.05,
+        power=0.8,
+    )
+
+    expected_string = "\n".join([
+        "Design 0f6ec75f1385ca9b7172daba623471ba",
+        "",
+        "\tExperiment type: regular experiment (CUPED adjusted)",
+        "\tPrimary metric: clicks",
+        (
+            "\tNumber of weeks of data before start of experiment used for"
+            " analysis: 4"
+        ),
+        "\tTotal experiment runtime weeks: 8",
+        "",
+        "Number of items for testing:",
+        "",
+        (
+            "\tNumber of items eligible for experimentation (before trimming):"
+            " 1000"
+        ),
+        "",
+        (
+            "\tTop and bottom 1.00% of items with highest / lowest clicks"
+            " during experiment runtime will be excluded from the analysis"
+        ),
+        "\tNumber of items remaining after trimming for the analysis: 980",
+        "",
+        "Extra details:",
+        "",
+        "\tAlpha threshold: 0.05",
+        "\tPower: 0.8",
+        "\tCoinflip salt: None",
+    ])
+    self.assertEqual(str(design), expected_string)
+
+  def test_prints_expected_string_with_pre_and_post_trimming(self):
+    design = ExperimentDesign(
+        n_items_before_trimming=1000,
+        runtime_weeks=8,
+        primary_metric="clicks",
+        pretest_weeks=4,
+        is_crossover=False,
+        pre_trim_top_percentile=0.01,
+        pre_trim_bottom_percentile=0.02,
+        post_trim_percentile=0.01,
+        crossover_washout_weeks=2,
+        alpha=0.05,
+        power=0.8,
+    )
+
+    expected_string = "\n".join([
+        "Design b9095ff233d9cccc342d62b2aef06ecb",
+        "",
+        "\tExperiment type: regular experiment (CUPED adjusted)",
+        "\tPrimary metric: clicks",
+        (
+            "\tNumber of weeks of data before start of experiment used for"
+            " analysis: 4"
+        ),
+        "\tTotal experiment runtime weeks: 8",
+        "",
+        "Number of items for testing:",
+        "",
+        (
+            "\tNumber of items eligible for experimentation (before trimming):"
+            " 1000"
+        ),
+        "",
+        (
+            "\tTop 1.00% of items with highest clicks in pre-test period will"
+            " not be included in experiment"
+        ),
+        (
+            "\tBottom 2.00% items with lowest clicks in pre-test period will"
+            " not be included in experiment"
+        ),
+        "\tNumber of items remaining after trimming for the experiment: 970",
+        "",
+        (
+            "\tTop and bottom 1.00% of items with highest / lowest clicks"
+            " during experiment runtime will be excluded from the analysis"
+        ),
+        "\tNumber of items remaining after trimming for the analysis: 952",
+        "",
+        "Extra details:",
+        "",
+        "\tAlpha threshold: 0.05",
+        "\tPower: 0.8",
+        "\tCoinflip salt: None",
+    ])
+    self.assertEqual(str(design), expected_string)
+
 
 class CoinflipTests(parameterized.TestCase):
 
