@@ -17,9 +17,8 @@
 import dataclasses
 import functools
 import numpy as np
+import numpy.typing as npt
 from scipy import stats
-
-ArrayLike = np._typing.ArrayLike
 
 
 class TrimmedArray:
@@ -608,8 +607,8 @@ def _relative_difference_confidence_interval(
 
 
 def _one_sample_standard_error(
-    standard_deviation: ArrayLike, sample_size: ArrayLike
-) -> ArrayLike:
+    standard_deviation: npt.ArrayLike, sample_size: npt.ArrayLike
+) -> npt.ArrayLike:
   """Returns the standard error on the mean.
 
   Args:
@@ -619,7 +618,7 @@ def _one_sample_standard_error(
   return standard_deviation / np.sqrt(sample_size)
 
 
-def _one_sample_degrees_of_freedom(sample_size: ArrayLike) -> ArrayLike:
+def _one_sample_degrees_of_freedom(sample_size: npt.ArrayLike) -> npt.ArrayLike:
   """Returns the degrees of freedom for the estimate of the mean of a sample.
 
   Args:
@@ -629,12 +628,12 @@ def _one_sample_degrees_of_freedom(sample_size: ArrayLike) -> ArrayLike:
 
 
 def _two_sample_standard_errors(
-    standard_deviation_1: ArrayLike,
-    standard_deviation_2: ArrayLike,
-    sample_size_1: ArrayLike,
-    sample_size_2: ArrayLike,
+    standard_deviation_1: npt.ArrayLike,
+    standard_deviation_2: npt.ArrayLike,
+    sample_size_1: npt.ArrayLike,
+    sample_size_2: npt.ArrayLike,
     equal_var: bool,
-) -> tuple[ArrayLike, ArrayLike, ArrayLike]:
+) -> tuple[npt.ArrayLike, npt.ArrayLike, npt.ArrayLike]:
   """Calculate the standard errors needed for a two sample t-test.
 
   Returns the standard error on the difference of the means, as well as
@@ -675,12 +674,12 @@ def _two_sample_standard_errors(
 
 
 def _two_sample_degrees_of_freedom(
-    standard_deviation_1: ArrayLike,
-    standard_deviation_2: ArrayLike,
-    sample_size_1: ArrayLike,
-    sample_size_2: ArrayLike,
+    standard_deviation_1: npt.ArrayLike,
+    standard_deviation_2: npt.ArrayLike,
+    sample_size_1: npt.ArrayLike,
+    sample_size_2: npt.ArrayLike,
     equal_var: bool,
-) -> ArrayLike:
+) -> npt.ArrayLike:
   """Returns the degrees of freedom for the difference of two means.
 
   For equal_var=True, uses the regular degrees of freedom from the students
@@ -1019,12 +1018,12 @@ def calculate_minimum_detectable_effect_from_stats(
 
 def yuens_t_test_ind_minimum_detectable_effect(
     *,
-    standard_deviation: ArrayLike,
-    sample_size: ArrayLike,
+    standard_deviation: npt.ArrayLike,
+    sample_size: npt.ArrayLike,
     alternative: str = "two-sided",
     power: float = 0.8,
     alpha: float = 0.05,
-) -> ArrayLike:
+) -> npt.ArrayLike:
   """Calculates the minimum detectable effect of an independent two sample test.
 
   This calculates the minimum detectable effect under the assumption that
@@ -1091,12 +1090,12 @@ def yuens_t_test_ind_minimum_detectable_effect(
 
 def yuens_t_test_paired_minimum_detectable_effect(
     *,
-    difference_standard_deviation: ArrayLike,
-    sample_size: ArrayLike,
+    difference_standard_deviation: npt.ArrayLike,
+    sample_size: npt.ArrayLike,
     alternative: str = "two-sided",
     power: float = 0.8,
     alpha: float = 0.05,
-) -> ArrayLike:
+) -> npt.ArrayLike:
   """Calculates the minimum detectable effect of a paired two sample test.
 
   The difference_standard_deviation should be calculated by estimating the

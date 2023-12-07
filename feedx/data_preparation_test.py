@@ -24,64 +24,79 @@ from feedx import data_preparation
 
 class SyntheticDataTest(parameterized.TestCase):
 
-  def test_generate_historical_synthetic_data_generates_expected_number_of_rows(
+  def test_generate_synthetic_data_generates_expected_number_of_rows(
       self,
   ):
     n_items = 500
-    historical_days = 90
+    weeks_before_start_date = 4
+    weeks_after_start_date = 8
+    n_days = (weeks_before_start_date + weeks_after_start_date) * 7
+
     rng = np.random.default_rng(123)
 
-    data = data_preparation.generate_historical_synthetic_data(
-        rng=rng, n_items=n_items, historical_days=historical_days
+    data = data_preparation.generate_synthetic_data(
+        rng=rng,
+        n_items=n_items,
+        weeks_before_start_date=weeks_before_start_date,
+        weeks_after_start_date=weeks_after_start_date,
     )
 
-    self.assertLen(data, n_items * historical_days)
+    self.assertLen(data, n_items * n_days)
 
-  def test_generate_historical_synthetic_data_has_expected_columns(self):
-    data = data_preparation.generate_historical_synthetic_data(
+  def test_generate_synthetic_data_has_expected_columns(self):
+    data = data_preparation.generate_synthetic_data(
         rng=np.random.default_rng(123)
     )
 
     self.assertCountEqual(
-        data.columns.values, ["item_id", "date", "clicks", "impressions"]
+        data.columns.values,
+        [
+            "item_id",
+            "date",
+            "clicks",
+            "impressions",
+            "total_cost",
+            "conversions",
+            "total_conversion_value",
+        ],
     )
 
   @parameterized.parameters([-0.1, 0.0])
-  def test_generate_historical_synthetic_data_raises_exception_for_bad_impressions_average(
+  def test_generate_synthetic_data_raises_exception_for_bad_impressions_average(
       self, impressions_average
   ):
     with self.assertRaises(ValueError):
-      data_preparation.generate_historical_synthetic_data(
+      data_preparation.generate_synthetic_data(
           rng=np.random.default_rng(123),
           impressions_average=impressions_average,
       )
 
   @parameterized.parameters([-0.1, 0.0])
-  def test_generate_historical_synthetic_data_raises_exception_for_bad_impressions_standard_deviation(
+  def test_generate_synthetic_data_raises_exception_for_bad_impressions_standard_deviation(
       self, impressions_standard_deviation
   ):
     with self.assertRaises(ValueError):
-      data_preparation.generate_historical_synthetic_data(
+      data_preparation.generate_synthetic_data(
           rng=np.random.default_rng(123),
           impressions_standard_deviation=impressions_standard_deviation,
       )
 
   @parameterized.parameters([-0.1, 0.0, 1.0, 1.1])
-  def test_generate_historical_synthetic_data_raises_exception_for_bad_ctr_average(
+  def test_generate_synthetic_data_raises_exception_for_bad_ctr_average(
       self, ctr_average
   ):
     with self.assertRaises(ValueError):
-      data_preparation.generate_historical_synthetic_data(
+      data_preparation.generate_synthetic_data(
           rng=np.random.default_rng(123),
           ctr_average=ctr_average,
       )
 
   @parameterized.parameters([-0.1, 0.0, 1.0, 1.1])
-  def test_generate_historical_synthetic_data_raises_exception_for_bad_ctr_standard_deviation(
+  def test_generate_synthetic_data_raises_exception_for_bad_ctr_standard_deviation(
       self, ctr_standard_deviation
   ):
     with self.assertRaises(ValueError):
-      data_preparation.generate_historical_synthetic_data(
+      data_preparation.generate_synthetic_data(
           rng=np.random.default_rng(123),
           ctr_standard_deviation=ctr_standard_deviation,
       )

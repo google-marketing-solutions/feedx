@@ -22,6 +22,7 @@ from collections.abc import Collection
 import datetime as dt
 from typing import Callable
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
 
 GOOGLE_ADS_PERFORMANCE_CSV_COLUMNS = {
@@ -33,33 +34,75 @@ GOOGLE_ADS_PERFORMANCE_CSV_COLUMNS = {
 GOOGLE_ADS_PERFORMANCE_READ_CSV_ARGS = {"header": 2, "thousands": ","}
 
 
-def generate_historical_synthetic_data(
+def _sample_from_lognormal(
+    rng: np.random.Generator,
+    mean: npt.ArrayLike,
+    standard_deviation: npt.ArrayLike,
+    size: int | tuple[int, int],
+) -> np.ndarray:
+  """Samples from a lognormal distribution."""
+  valid_mean = mean > 0
+  valid_standard_deviation = standard_deviation > 0
+  if not np.all(valid_mean):
+    raise ValueError("mean must be greater than 0")
+  if not np.all(valid_standard_deviation):
+    raise ValueError("standard_deviation must be greater than 0")
+
+  lognormal_mean = np.log(mean) - 0.5 * np.log(
+      standard_deviation**2 / mean**2 + 1
+  )
+  lognormal_sigma = np.sqrt(np.log(standard_deviation**2 / mean**2 + 1))
+  return rng.lognormal(mean=lognormal_mean, sigma=lognormal_sigma, size=size)
+
+
+def _sample_from_beta(
+    rng: np.random.Generator,
+    mean: npt.ArrayLike,
+    standard_deviation: npt.ArrayLike,
+    size: int | tuple[int, int],
+) -> np.ndarray:
+  """Samples from a beta distribution."""
+  valid_mean = 0 < mean < 1
+  valid_standard_deviation = 0 < standard_deviation < 1
+  if not np.all(valid_mean):
+    raise ValueError("mean must be between 0 and 1")
+  if not np.all(valid_standard_deviation):
+    raise ValueError("standard_deviation must be between 0 and 1")
+
+  a_plus_b = np.sqrt(mean * (1.0 - mean)) / standard_deviation
+  return rng.beta(
+      a=mean * a_plus_b,
+      b=(1.0 - mean) * a_plus_b,
+      size=size,
+  )
+
+
+def generate_synthetic_data(
     rng: np.random.Generator,
     n_items: int = 7000,
     impressions_average: float = 100.0,
     impressions_standard_deviation: float = 100.0,
     ctr_average: float = 0.02,
     ctr_standard_deviation: float = 0.015,
-    historical_days: int = 90,
+    cpc_average: float = 0.5,
+    cpc_item_level_standard_deviation: float = 0.5,
+    cpc_daily_level_standard_deviation: float = 0.5,
+    conversion_rate_average: float = 0.1,
+    conversion_rate_standard_deviation: float = 0.075,
+    conversion_value_average: float = 100.0,
+    conversion_value_item_level_standard_deviation: float = 80.0,
+    conversion_value_daily_level_standard_deviation: float = 10.0,
+    weeks_before_start_date: int = 0,
+    weeks_after_start_date: int = 13,
+    start_date: str = "2023-01-01",
 ) -> pd.DataFrame:
-  """Generates historical synthetic experiment data.
+  """Generates synthetic data for demonstrating the FeedX notebooks.
 
-  This generates daily clicks and impressions data which can be used to
-  demonstrate how FeedX designs experiments. It is simulated historical
-  data, meaning data from before the start of the experiment.
-
-  It uses a lognormal distribution for the expected impressions, since it is >=0
-  and has
-  a positive skew, mirroring many real world datasets. Each item has the same
-  expected
-  impressions for every date. The actual impressions are then sampled using a
-  poisson distribution, with
-  the mean being the expected impressions.
-
-  The click through rate (CTR) is sampled for each item from a beta
-  distribution,
-  which ensures it is between 0 and 1. Then the number of clicks is sampled
-  using a binomial distribution with the CTR and the number of impressions.
+  This generates daily clicks, impressions, cost, conversions and conversion
+  value data which can be used to demonstrate how FeedX designs and analyzes
+  experiments. There is no "effect" in the data, all items are drawn from the
+  same distribution, so when used to demonstrate an experiment post analysis
+  there will be no difference between control and treatment.
 
   Args:
     rng: The random number generator used to generate the data.
@@ -69,72 +112,121 @@ def generate_historical_synthetic_data(
       items.
     ctr_average: The average CTR for the items.
     ctr_standard_deviation: The standard deviation of the CTR of the items.
-    historical_days: The number of days of data to simulate.
+    cpc_average: The average CPC for the items.
+    cpc_item_level_standard_deviation: The standard deviation of the average CPC
+      of the items.
+    cpc_daily_level_standard_deviation: The standard deviation of the CPC per
+      day within each item.
+    conversion_rate_average: The average conversion rate of the items.
+    conversion_rate_standard_deviation: The standard deviation of the conversion
+      rates of the items.
+    conversion_value_average: The average conversion value of the items.
+    conversion_value_item_level_standard_deviation: The standard deviation of
+      the average conversion value per item.
+    conversion_value_daily_level_standard_deviation: The standard deviation of
+      the conversion value per day for each item.
+    weeks_before_start_date: The number of weeks of data to simulate before the
+      start date.
+    weeks_after_start_date: The number of weeks of data to simulate after the
+      start date.
+    start_date: The reference date for the experiment.
 
   Returns:
-    Dataframe with synthetic historical data.
+    Dataframe with synthetic data including the columns date, item_id,
+    impressions, clicks, conversions, total_cost, total_conversion_value.
 
   Raises:
-    ValueError: If ctr_average or ctr_standard_deviation are less than 0 or
-      greater than 1, or if the impressions_average or
-      impressions_standard_devation are less than or equal to 0.
+    ValueError: If the parameters for the simulation are outside the expected
+      range for their distribution. All the ratios (CTR, CPC and conversion_rate
+      must be between 0 and 1, and all the others must be greater than 0.)
   """
-  valid_ctr_average = ctr_average > 0 and ctr_average < 1
-  valid_ctr_standard_deviation = (
-      ctr_standard_deviation > 0 and ctr_standard_deviation < 1
-  )
-  valid_impressions_average = impressions_average > 0
-  valid_impressions_standard_deviation = impressions_standard_deviation > 0
-
-  if not valid_ctr_average:
-    raise ValueError("ctr_average must be between 0 and 1")
-  if not valid_ctr_standard_deviation:
-    raise ValueError("ctr_standard_deviation must be between 0 and 1")
-  if not valid_impressions_average:
-    raise ValueError("impressions_average must be greater than 0")
-  if not valid_impressions_standard_deviation:
-    raise ValueError("impressions_standard_deviation must be greater than 0")
 
   date_fmt = "%Y-%m-%d"
-  today = dt.date.today()
-  dates = [
-      (today - dt.timedelta(days=i + 1)).strftime(date_fmt)
-      for i in range(historical_days)
+  start_date_dt = dt.datetime.strptime(start_date, date_fmt)
+  dates_after_start_date = [
+      (start_date_dt + dt.timedelta(days=i)).strftime(date_fmt)
+      for i in range(weeks_after_start_date * 7)
   ]
+  dates_before_start_date = [
+      (start_date_dt - dt.timedelta(days=i + 1)).strftime(date_fmt)
+      for i in range(weeks_before_start_date * 7)
+  ]
+  dates = dates_after_start_date + dates_before_start_date
+
   item_ids = [f"item_{i}" for i in range(n_items)]
 
   dates_matrix, item_ids_matrix = np.meshgrid(dates, item_ids)
-
   shape = dates_matrix.shape
 
-  mean = np.log(impressions_average) - 0.5 * np.log(
-      impressions_standard_deviation**2 / impressions_average**2 + 1
+  # Expected impressions per day come from a log normal dist
+  expected_impressions = _sample_from_lognormal(
+      rng,
+      mean=impressions_average,
+      standard_deviation=impressions_standard_deviation,
+      size=(n_items, 1),
   )
-  sigma = np.sqrt(
-      np.log(impressions_standard_deviation**2 / impressions_average**2 + 1)
-  )
-  expected_impressions = rng.lognormal(
-      mean=mean, sigma=sigma, size=n_items
-  ).reshape(-1, 1)
 
-  beta_dist_params = (
-      np.sqrt(ctr_average * (1.0 - ctr_average)) / ctr_standard_deviation
+  # Expected CTR comes from a beta distribution
+  expected_ctr = _sample_from_beta(
+      rng,
+      mean=ctr_average,
+      standard_deviation=ctr_standard_deviation,
+      size=(n_items, 1),
   )
-  expected_ctr = rng.beta(
-      a=ctr_average * beta_dist_params,
-      b=(1.0 - ctr_average) * beta_dist_params,
-      size=n_items,
-  ).reshape(-1, 1)
 
+  # Expected CPC per item comes from a log normal distribution
+  expected_cpc = _sample_from_lognormal(
+      rng,
+      mean=cpc_average,
+      standard_deviation=cpc_item_level_standard_deviation,
+      size=(n_items, 1),
+  )
+
+  # Expected conversion rate comes from a beta distribution
+  expected_conversion_rate = _sample_from_beta(
+      rng,
+      mean=conversion_rate_average,
+      standard_deviation=conversion_rate_standard_deviation,
+      size=(n_items, 1),
+  )
+
+  # Expected conversion value comes from a log normal distribution
+  expected_conversion_value = _sample_from_lognormal(
+      rng,
+      mean=conversion_value_average,
+      standard_deviation=conversion_value_item_level_standard_deviation,
+      size=(n_items, 1),
+  )
+
+  # Now we sample the daily values, by broadcasting, so each of the
+  # "expected_*" values above are constant for each item, but the values
+  # we sample now are different for each item+day combination.
   impressions = rng.poisson(lam=expected_impressions, size=shape)
-
   clicks = rng.binomial(n=impressions, p=expected_ctr)
+  cpc = _sample_from_lognormal(
+      rng,
+      mean=expected_cpc,
+      standard_deviation=cpc_daily_level_standard_deviation,
+      size=shape,
+  )
+  conversions = rng.binomial(n=clicks, p=expected_conversion_rate)
+  average_conversion_value = _sample_from_lognormal(
+      rng,
+      mean=expected_conversion_value,
+      standard_deviation=conversion_value_daily_level_standard_deviation,
+      size=shape,
+  )
+  total_cost = cpc * clicks
+  total_conversion_value = average_conversion_value * conversions
 
   data = pd.DataFrame({
       "date": dates_matrix.flatten(),
       "item_id": item_ids_matrix.flatten(),
       "impressions": impressions.flatten(),
       "clicks": clicks.flatten(),
+      "conversions": conversions.flatten(),
+      "total_cost": total_cost.flatten(),
+      "total_conversion_value": total_conversion_value.flatten(),
   })
 
   return data
