@@ -45,7 +45,7 @@ pip install feedx
 
 You can then import FeedX and use it for designing and analyzing experiments on your Shopping feed. For example, the following code will estimate the minimum detectable effect of an experiment design and validate with 1000 simulations that the results are reliable:
 
-```{python}
+```python
 import numpy as np
 
 from feedx import data_preparation
@@ -70,22 +70,22 @@ data_preparation.validate_historical_data(
 
 # Define the experiment design
 design = experiment_design.ExperimentDesign(
-	n_items_before_trimming=2000,
-	runtime_weeks=8,
-	pretest_weeks=4,
-	is_crossover=True,
-	crossover_washout_weeks=1,
-	primary_metric="clicks",
-	pre_trim_top_percentile=0.01,
-	pre_trim_bottom_percentile=0.0,
-	post_trim_percentile=0.0
+  n_items_before_trimming=2000,
+  runtime_weeks=8,
+  pretest_weeks=4,
+  is_crossover=True,
+  crossover_washout_weeks=1,
+  primary_metric="clicks",
+  pre_trim_top_percentile=0.01,
+  pre_trim_bottom_percentile=0.0,
+  post_trim_percentile=0.0
 )
 
 # Run the simulation analysis to estimate and validate the minimum detectable effect
 minimum_start_week = experiment_simulations.calculate_minimum_start_week_id(
-	candidate_runtime_weeks=[8],
-	candidate_pretest_weeks=[4],
-	historical_week_ids=historical_data["week_number"].unique()
+  candidate_runtime_weeks=[8],
+  candidate_pretest_weeks=[4],
+  historical_week_ids=historical_data["week_number"].unique()
 )
 analysis = experiment_simulations.SimulationAnalysis(
   design=design,
@@ -100,7 +100,7 @@ analysis.validate(n_simulations=1000)
 
 # Print the results
 if not analysis.all_robustness_checks_pass:
-	print("WARNING: The results did not pass the validation checks.")
+  print("WARNING: The results did not pass the validation checks.")
 
 print(f"Relative minimum detectable effect on clicks = {analysis.relative_minimum_detectable_effect:.2%}")
 ```
@@ -314,13 +314,17 @@ The confidence interval is a similar concept, which says that if you ran the sam
 
 The input data required for both the FeedX design notebook and the FeedX analysis notebook can be extracted from Google Ads in several ways. Below are details outlining the sources and how to extract the required data:
 
-1. Users can download item-level reports through the Google Ads interface by following these steps:
-  1. Reports > Predefined reports (Dimensions) > Shopping > Shopping - Item ID. 
+Users can download item-level reports through the Google Ads interface by following these steps:
+
+1. Reports > Predefined reports (Dimensions) > Shopping > Shopping - Item ID. 
   <br/><img align="center" width="300" src="./images/data_download_1.png" alt="data_download_1" />
-  1. The Item ID, Day or Week, Clicks, and Impressions must be selected. Other metrics are optional. Use the date picker to select the date range required for the experiment
+1. The Item ID, Day or Week, Clicks, and Impressions must be selected. Other metrics are optional. Use the date picker to select the date range required for the experiment
   <br/><img align="center" width="900" src="./images/data_download_2.png" alt="data_download_2" />
-  1. Download the report in a format compatible with Google Sheets, for example .csv.
+1. Download the report in a format compatible with Google Sheets, for example .csv.
   <br/><img align="center" width="200" src="./images/data_download_3.png" alt="data_download_3" />
+
+Alternatively, they can also download the item-level reports via:
+
 1. The [Google Ads API](https://developers.google.com/google-ads/api/docs/get-started/introduction) is the programmatic interface to Google Ads, used for managing large or complex Google Ads accounts and campaigns. Users can create and submit a query to the API to get back data.
 1. [Google Ads report transformation](https://cloud.google.com/bigquery/docs/google-ads-transformation) allows users to access tables and views of Ads reports with BigQuery. The [Shopping Performance view](https://developers.google.com/google-ads/api/fields/v15/shopping_performance_view) contains item-level metrics from Shopping campaigns.
 
