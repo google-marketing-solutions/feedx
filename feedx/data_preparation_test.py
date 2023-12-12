@@ -1011,6 +1011,36 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         experiment_has_concluded=False,
     )
 
+  @mock_experiment_design_validation
+  def test_primary_metric_must_be_one_of_the_metrics(
+      self, mock_experiment_design
+  ):
+    experiment_data = pd.DataFrame({
+        "date": pd.to_datetime(
+            ["2023-10-01", "2023-10-01", "2023-10-08", "2023-10-08"]
+        ),
+        "date_id": [1, 1, 2, 2],
+        "item_id": ["1", "2", "1", "2"],
+        "clicks": [1, 2, 3, 4],
+        "impressions": [10, 12, 13, 14],
+    })
+    design = experiment_design.ExperimentDesign(
+        n_items_before_trimming=2,
+        runtime_weeks=2,
+        pretest_weeks=0,
+        **self.irrelevant_design_args
+    )
+    with self.assertRaises(ValueError):
+      data_preparation.validate_experiment_data(
+          experiment_data,
+          design=design,
+          item_id_column="item_id",
+          date_column="date",
+          date_id_column="date_id",
+          metric_columns=["impressions"],
+          experiment_start_date="2023-10-01",
+      )
+
 
 class AddWeekIdAndWeekStartTests(parameterized.TestCase):
 

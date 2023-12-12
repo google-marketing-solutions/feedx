@@ -889,6 +889,7 @@ def validate_experiment_data(
   - The earliest and last date in the data match what is required for the design
     given the experiment start date and the runtime and pretest weeks. If
     experiment_has_concluded is set to False, it only checks the earliest date.
+  - The primary metric exists as a column in the data.
 
   Args:
     experiment_data: The experiment data to be validated.
@@ -897,7 +898,8 @@ def validate_experiment_data(
     date_column: The column in the data containing the date. This column must
       have a datetime type.
     date_id_column: The column containing an integer identifier for the dates.
-    metric_columns: The columns containing the metrics to be analyzed.
+    metric_columns: The columns containing the metrics to be analyzed. Must
+      include the primary metric from the design.
     experiment_start_date: The date the experiment started. Must have the format
       YYYY-MM-DD.
     experiment_has_concluded: Has the experiment finished (reached it's planned
@@ -908,6 +910,12 @@ def validate_experiment_data(
   Raises:
     ValueError: If any of the validations fail.
   """
+  if design.primary_metric not in metric_columns:
+    raise ValueError(
+        f"The primary metric {design.primary_metric} must be one of the"
+        " metric_columns."
+    )
+
   _validate_no_null_values(experiment_data)
   _validate_every_value_exists_exactly_once_for_every_group(
       experiment_data,
