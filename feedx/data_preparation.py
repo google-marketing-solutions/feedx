@@ -1192,3 +1192,157 @@ def prepare_and_validate_historical_data(
   )
 
   return clean_data
+
+
+def trim_outliers(
+    data: pd.DataFrame,
+    order_by: str | tuple[str, ...],
+    trim_percentile_top: float,
+    trim_percentile_bottom: float,
+    rng: np.random.Generator,
+) -> pd.DataFrame:
+  """Trims outliers from the data.
+
+  1. Calculates the number of rows to trim from the top and bottom by
+    multiplying the trim percentile by the number of rows in the data, and
+    flooring the result.
+  2. If 0 rows are to be trimmed, return the data.
+  3. Rank the data by the order_by column, with ties being given a random order
+    using the random number generator rng.
+  4. Remove the rows to be trimmed from either end and return the data.
+
+  Args:
+    data: The data to be trimmed.
+    order_by: The column to order by to select the outliers to trim.
+    trim_percentile_top: The fraction of the highest values to remove from the
+      data.
+    trim_percentile_bottom: The fraction of the lowest values to remove from the
+      data.
+    rng: The random number generator used to break ties in the ordering.
+
+  Returns:
+    The data with the outliers trimmed.
+
+  Raises:
+    ValueError: If either of the trim_perentile_top or trim_percentile_bottom
+      are negative, or if trim_perentile_top + trim_percentile_bottom >= 1.0.
+      This is to ensure that you do not trim 100% of the data.
+  """
+  if trim_percentile_top < 0.0:
+    raise ValueError("trim_percentile_top must be >= 0.0.")
+  if trim_percentile_bottom < 0.0:
+    raise ValueError("trim_percentile_bottom must be >= 0.0.")
+  if trim_percentile_top + trim_percentile_bottom >= 1.0:
+    raise ValueError(
+        "trim_percentile_top + trim_percentile_bottom must be < 1.0, otherwise"
+        f" you will remove all the data. {trim_percentile_top = }, "
+        f"{trim_percentile_bottom = }, so "
+        f"{trim_percentile_top + trim_percentile_bottom = } >= 1.0."
+    )
+
+  n_samples = len(data.index.values)
+  n_trim_top = int(np.floor(n_samples * trim_percentile_top))
+  n_trim_bottom = int(np.floor(n_samples * trim_percentile_bottom))
+
+  if (n_trim_top == 0) & (n_trim_bottom == 0):
+    return data
+
+  min_rank = n_trim_top
+  max_rank = n_samples - n_trim_bottom
+
+  rank = data.sample(frac=1.0, random_state=rng)[order_by].rank(
+      method="first", ascending=False
+  )
+
+  return data.loc[(rank > min_rank) & (rank <= max_rank)].copy()
+
+
+def perform_treatment_assignment(
+    historical_data: pd.DataFrame,
+    *,
+    design: experiment_design.ExperimentDesign,
+    rng: np.random.Generator,
+    item_id_column: str,
+    week_id_column: str,
+    treatment_assignment_column: str = "treatment_assignment",
+) -> pd.DataFrame:
+  """Returns the items for the experiment with their treatment assignment.
+
+  This function performs the pre-test trimming if specified in the experiment
+  design, using the most recent weeks in the historical data for the pre-test
+  weeks.
+
+  Then, with the final set of items, it randomises them into control (0)
+  or treatment (1) using a coinflip. The salt from the coinflip is taken
+  from the experiment design if it exists, and otherwise a random salt is
+  generated and added to the design.
+
+  Args:
+    historical_data: The historical data to use to get the items and perform the
+      trimming.
+    design: The experiment design.
+    rng: The random number generator, used to break ties in the trimming.
+    item_id_column: The name of the column in historical_data containing the
+      item identifier.
+    week_id_column: The name of the column in historical_data containing the
+      week identifier.
+    treatment_assignment_column: The name of the output column that will contain
+      the treatment assignment. Defaults to "treatment_assignment".
+
+  Returns:
+    A dataframe containing the item_ids selected for the experiment (after
+    pre-trimming), and the treatment assignment generated from the item id and
+    coinflip salt.
+
+  Raises:
+    ValueError: If the item_id_column or week_id_column are not in the
+      historical_data, or if the treatment_assignment_column is the same as the
+      item_id_column.
+  """
+
+  required_columns = {item_id_column, week_id_column}
+  missing_columns = required_columns - set(historical_data.columns)
+  if missing_columns:
+    raise ValueError(
+        "The historical_data is missing the following required columns: "
+        f"{missing_columns}"
+    )
+
+  if item_id_column == treatment_assignment_column:
+    raise ValueError(
+        "The treatment_assignment_column must not be the same as the"
+        f" item_id_column, both are '{item_id_column}'."
+    )
+
+  if design.coinflip_salt:
+    coinflip = experiment_design.Coinflip(design.coinflip_salt)
+    print(f"Using coinflip salt from design: {coinflip.salt}")
+  else:
+    coinflip = experiment_design.Coinflip.with_random_salt()
+    design.coinflip_salt = coinflip.salt
+    print(f"Generating random coinflip salt: {coinflip.salt}")
+
+  max_week_id = historical_data[week_id_column].max()
+  start_week_id = max_week_id - design.pretest_weeks
+  pretest_data = historical_data.loc[
+      historical_data[week_id_column] > start_week_id
+  ].copy()
+  pretest_items = (
+      pretest_data.groupby(item_id_column)[design.primary_metric]
+      .sum()
+      .reset_index()
+  )
+
+  experiment_items = trim_outliers(
+      pretest_items,
+      order_by=design.primary_metric,
+      trim_percentile_bottom=design.pre_trim_bottom_percentile,
+      trim_percentile_top=design.pre_trim_top_percentile,
+      rng=rng,
+  )[[item_id_column]]
+
+  experiment_items[treatment_assignment_column] = experiment_items[
+      item_id_column
+  ].apply(coinflip)
+
+  return experiment_items

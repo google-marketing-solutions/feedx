@@ -25,6 +25,7 @@ from pandas.io.formats import style
 from scipy import stats
 import tqdm.autonotebook as tqdm
 
+from feedx import data_preparation
 from feedx import experiment_analysis
 from feedx import experiment_design
 from feedx import statistics
@@ -557,7 +558,7 @@ class SimulationAnalysis:
       )
 
     if self.design.pretest_weeks > 0:
-      pivoted_data = experiment_design.trim_outliers(
+      pivoted_data = data_preparation.trim_outliers(
           pivoted_data,
           order_by=(self.design.primary_metric, "pretest"),
           trim_percentile_top=self.design.pre_trim_top_percentile,
