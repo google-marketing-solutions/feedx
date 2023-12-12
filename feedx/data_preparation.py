@@ -21,9 +21,12 @@ FeedX.
 from collections.abc import Collection
 import datetime as dt
 from typing import Callable
+
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
+
+from feedx import experiment_design
 
 GOOGLE_ADS_PERFORMANCE_CSV_COLUMNS = {
     "date_column": "Week",
@@ -734,6 +737,22 @@ def _validate_all_metrics_are_positive(
     )
 
 
+def _validate_number_of_items_matches_design(
+    experiment_data: pd.DataFrame,
+    design: experiment_design.ExperimentDesign,
+    item_id_column: str,
+) -> None:
+  """Validates the number of items matches n_items_after_pre_trim in design."""
+  n_items = experiment_data[item_id_column].nunique()
+  if n_items != design.n_items_after_pre_trim:
+    raise ValueError(
+        f"The experiment data has {n_items} unique item_ids, but"
+        f" {design.n_items_after_pre_trim = }."
+    )
+
+  print("Number of items matches design, check passed.")
+
+
 def validate_historical_data(
     historical_data: pd.DataFrame,
     item_id_column: str,
@@ -796,6 +815,7 @@ def validate_historical_data(
 def validate_experiment_data(
     experiment_data: pd.DataFrame,
     *,
+    design: experiment_design.ExperimentDesign,
     item_id_column: str,
     date_column: str,
     date_id_column: str,
@@ -815,9 +835,11 @@ def validate_experiment_data(
   - The date_id must be integers and consecutive.
   - The metrics are not negative, unless they are in
     can_be_negative_metric_columns.
+  - The number of items in the data matches the expected number in the design.
 
   Args:
     experiment_data: The experiment data to be validated.
+    design: The experiment design for this experiment.
     item_id_column: The column in the data contining the item identifier.
     date_column: The column in the data containing the date. This column must
       have a datetime type.
@@ -861,6 +883,10 @@ def validate_experiment_data(
         metric_columns=can_be_negative_metric_columns,
         required=False,
     )
+
+  _validate_number_of_items_matches_design(
+      experiment_data, design, item_id_column
+  )
 
 
 def add_at_least_one_metrics(
