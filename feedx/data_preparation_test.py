@@ -364,7 +364,7 @@ class ValidateHistoricalDataTests(parameterized.TestCase):
         "date": pd.to_datetime(
             ["2023-10-01", "2023-10-01", "2023-10-02", "2023-10-02"]
         ),
-        "date_id": [1, 1, 2, 2],
+        "week_id": [1, 1, 2, 2],
         "item_id": ["1", "2", "1", "2"],
         "clicks": [1, 2, 3, 4],
     })
@@ -373,7 +373,7 @@ class ValidateHistoricalDataTests(parameterized.TestCase):
         historical_data,
         item_id_column="item_id",
         date_column="date",
-        date_id_column="date_id",
+        week_id_column="week_id",
         primary_metric_column="clicks",
     )
 
@@ -382,7 +382,7 @@ class ValidateHistoricalDataTests(parameterized.TestCase):
         "date": pd.to_datetime(
             ["2023-10-01", "2023-10-01", "2023-10-08", "2023-10-08"]
         ),
-        "date_id": [1, 1, 2, 2],
+        "week_id": [1, 1, 2, 2],
         "item_id": ["1", "2", "1", "2"],
         "clicks": [1, 2, 3, 4],
     })
@@ -391,7 +391,7 @@ class ValidateHistoricalDataTests(parameterized.TestCase):
         historical_data,
         item_id_column="item_id",
         date_column="date",
-        date_id_column="date_id",
+        week_id_column="week_id",
         primary_metric_column="clicks",
     )
 
@@ -404,7 +404,7 @@ class ValidateHistoricalDataTests(parameterized.TestCase):
             "2023-10-02",
             "2023-10-02",
         ]),
-        "date_id": [1, 1, 2, 2, 2],
+        "week_id": [1, 1, 2, 2, 2],
         "item_id": ["1", "2", "1", "2", "2"],
         "clicks": [1, 2, 3, 4, 5],
     })
@@ -414,14 +414,14 @@ class ValidateHistoricalDataTests(parameterized.TestCase):
           bad_historical_data,
           item_id_column="item_id",
           date_column="date",
-          date_id_column="date_id",
+          week_id_column="week_id",
           primary_metric_column="clicks",
       )
 
   def test_historical_data_must_have_every_item_and_date_combination(self):
     bad_historical_data = pd.DataFrame({
         "date": pd.to_datetime(["2023-10-01", "2023-10-01", "2023-10-02"]),
-        "date_id": [1, 1, 2],
+        "week_id": [1, 1, 2],
         "item_id": ["1", "2", "1"],
         "clicks": [1, 2, 3],
     })
@@ -431,7 +431,7 @@ class ValidateHistoricalDataTests(parameterized.TestCase):
           bad_historical_data,
           item_id_column="item_id",
           date_column="date",
-          date_id_column="date_id",
+          week_id_column="week_id",
           primary_metric_column="clicks",
       )
 
@@ -440,7 +440,7 @@ class ValidateHistoricalDataTests(parameterized.TestCase):
         "date": pd.to_datetime(
             ["2023-10-01", "2023-10-01", "2023-10-02", "2023-10-02"]
         ),
-        "date_id": [1, 1, 2, 2],
+        "week_id": [1, 1, 2, 2],
         "item_id": ["1", "2", "1", "2"],
         "clicks": [1, 2, 3, None],
     })
@@ -450,7 +450,7 @@ class ValidateHistoricalDataTests(parameterized.TestCase):
           bad_historical_data,
           item_id_column="item_id",
           date_column="date",
-          date_id_column="date_id",
+          week_id_column="week_id",
           primary_metric_column="clicks",
       )
 
@@ -459,7 +459,7 @@ class ValidateHistoricalDataTests(parameterized.TestCase):
         "date": pd.to_datetime(
             ["2023-10-01", "2023-10-01", "2023-10-03", "2023-10-03"]
         ),
-        "date_id": [1, 1, 2, 2],
+        "week_id": [1, 1, 2, 2],
         "item_id": ["1", "2", "1", "2"],
         "clicks": [1, 2, 3, 4],
     })
@@ -469,16 +469,16 @@ class ValidateHistoricalDataTests(parameterized.TestCase):
           bad_historical_data,
           item_id_column="item_id",
           date_column="date",
-          date_id_column="date_id",
+          week_id_column="week_id",
           primary_metric_column="clicks",
       )
 
-  def test_historical_data_date_id_must_be_aligned_with_date(self):
+  def test_historical_data_week_id_must_be_aligned_with_date(self):
     bad_historical_data = pd.DataFrame({
         "date": pd.to_datetime(
             ["2023-10-01", "2023-10-01", "2023-10-03", "2023-10-03"]
         ),
-        "date_id": [2, 2, 1, 1],
+        "week_id": [2, 2, 1, 1],
         "item_id": ["1", "2", "1", "2"],
         "clicks": [1, 2, 3, 4],
     })
@@ -488,7 +488,7 @@ class ValidateHistoricalDataTests(parameterized.TestCase):
           bad_historical_data,
           item_id_column="item_id",
           date_column="date",
-          date_id_column="date_id",
+          week_id_column="week_id",
           primary_metric_column="clicks",
       )
 
@@ -497,7 +497,7 @@ class ValidateHistoricalDataTests(parameterized.TestCase):
         "date": pd.to_datetime(
             ["2023-10-01", "2023-10-01", "2023-10-02", "2023-10-02"]
         ),
-        "date_id": [1, 1, 2, 2],
+        "week_id": [1, 1, 2, 2],
         "item_id": ["1", "2", "1", "2"],
         "clicks": [1, 2, 3, np.inf],
     })
@@ -507,7 +507,7 @@ class ValidateHistoricalDataTests(parameterized.TestCase):
           bad_historical_data,
           item_id_column="item_id",
           date_column="date",
-          date_id_column="date_id",
+          week_id_column="week_id",
           primary_metric_column="clicks",
       )
 
@@ -516,7 +516,7 @@ class ValidateHistoricalDataTests(parameterized.TestCase):
         "date": pd.to_datetime(
             ["2023-10-01", "2023-10-01", "2023-10-02", "2023-10-02"]
         ),
-        "date_id": [1, 1, 2, 2],
+        "week_id": [1, 1, 2, 2],
         "item_id": ["1", "2", "1", "2"],
         "clicks": [1, 2, 3, -1],
     })
@@ -526,7 +526,7 @@ class ValidateHistoricalDataTests(parameterized.TestCase):
           bad_historical_data,
           item_id_column="item_id",
           date_column="date",
-          date_id_column="date_id",
+          week_id_column="week_id",
           primary_metric_column="clicks",
       )
 
@@ -537,7 +537,7 @@ class ValidateHistoricalDataTests(parameterized.TestCase):
         "date": pd.to_datetime(
             ["2023-10-01", "2023-10-01", "2023-10-02", "2023-10-02"]
         ),
-        "date_id": [1, 1, 2, 2],
+        "week_id": [1, 1, 2, 2],
         "item_id": ["1", "2", "1", "2"],
         "clicks": [1, 2, 3, -1],
     })
@@ -546,19 +546,19 @@ class ValidateHistoricalDataTests(parameterized.TestCase):
         good_historical_data,
         item_id_column="item_id",
         date_column="date",
-        date_id_column="date_id",
+        week_id_column="week_id",
         primary_metric_column="clicks",
         require_positive_primary_metric=False,
     )
 
-  def test_historical_data_date_id_must_be_consecutive(
+  def test_historical_data_week_id_must_be_consecutive(
       self,
   ):
     good_historical_data = pd.DataFrame({
         "date": pd.to_datetime(
             ["2023-10-01", "2023-10-01", "2023-10-02", "2023-10-02"]
         ),
-        "date_id": [1, 1, 3, 3],
+        "week_id": [1, 1, 3, 3],
         "item_id": ["1", "2", "1", "2"],
         "clicks": [1, 2, 3, -1],
     })
@@ -567,19 +567,19 @@ class ValidateHistoricalDataTests(parameterized.TestCase):
           good_historical_data,
           item_id_column="item_id",
           date_column="date",
-          date_id_column="date_id",
+          week_id_column="week_id",
           primary_metric_column="clicks",
           require_positive_primary_metric=False,
       )
 
-  def test_historical_data_date_id_must_be_an_integer(
+  def test_historical_data_week_id_must_be_an_integer(
       self,
   ):
     good_historical_data = pd.DataFrame({
         "date": pd.to_datetime(
             ["2023-10-01", "2023-10-01", "2023-10-02", "2023-10-02"]
         ),
-        "date_id": ["1", "1", "2", "2"],
+        "week_id": ["1", "1", "2", "2"],
         "item_id": ["1", "2", "1", "2"],
         "clicks": [1, 2, 3, -1],
     })
@@ -589,7 +589,7 @@ class ValidateHistoricalDataTests(parameterized.TestCase):
           good_historical_data,
           item_id_column="item_id",
           date_column="date",
-          date_id_column="date_id",
+          week_id_column="week_id",
           primary_metric_column="clicks",
           require_positive_primary_metric=False,
       )
@@ -626,7 +626,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         "date": pd.to_datetime(
             ["2023-10-01", "2023-10-01", "2023-10-02", "2023-10-02"]
         ),
-        "date_id": [1, 1, 2, 2],
+        "week_id": [1, 1, 2, 2],
         "item_id": ["1", "2", "1", "2"],
         "clicks": [1, 2, 3, 4],
         "impressions": [10, 12, 13, 14],
@@ -644,7 +644,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         design=design,
         item_id_column="item_id",
         date_column="date",
-        date_id_column="date_id",
+        week_id_column="week_id",
         metric_columns=["clicks", "impressions"],
         experiment_start_date="2023-10-01",
         treatment_assignment_column="treatment_assignment",
@@ -658,7 +658,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         "date": pd.to_datetime(
             ["2023-10-01", "2023-10-01", "2023-10-08", "2023-10-08"]
         ),
-        "date_id": [1, 1, 2, 2],
+        "week_id": [1, 1, 2, 2],
         "item_id": ["1", "2", "1", "2"],
         "clicks": [1, 2, 3, 4],
         "impressions": [10, 12, 13, 14],
@@ -676,7 +676,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         design=design,
         item_id_column="item_id",
         date_column="date",
-        date_id_column="date_id",
+        week_id_column="week_id",
         metric_columns=["clicks", "impressions"],
         experiment_start_date="2023-10-01",
         treatment_assignment_column="treatment_assignment",
@@ -694,7 +694,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
             "2023-10-02",
             "2023-10-02",
         ]),
-        "date_id": [1, 1, 2, 2, 2],
+        "week_id": [1, 1, 2, 2, 2],
         "item_id": ["1", "2", "1", "2", "2"],
         "clicks": [1, 2, 3, 4, 5],
         "impressions": [10, 12, 13, 14, 15],
@@ -713,7 +713,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
           design=design,
           item_id_column="item_id",
           date_column="date",
-          date_id_column="date_id",
+          week_id_column="week_id",
           metric_columns=["clicks", "impressions"],
           experiment_start_date="2023-10-01",
           treatment_assignment_column="treatment_assignment",
@@ -725,7 +725,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
   ):
     bad_experiment_data = pd.DataFrame({
         "date": pd.to_datetime(["2023-10-01", "2023-10-01", "2023-10-02"]),
-        "date_id": [1, 1, 2],
+        "week_id": [1, 1, 2],
         "item_id": ["1", "2", "1"],
         "clicks": [1, 2, 3],
         "impressions": [10, 12, 13],
@@ -744,7 +744,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
           design=design,
           item_id_column="item_id",
           date_column="date",
-          date_id_column="date_id",
+          week_id_column="week_id",
           metric_columns=["clicks", "impressions"],
           experiment_start_date="2023-10-01",
           treatment_assignment_column="treatment_assignment",
@@ -756,7 +756,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         "date": pd.to_datetime(
             ["2023-10-01", "2023-10-01", "2023-10-02", "2023-10-02"]
         ),
-        "date_id": [1, 1, 2, 2],
+        "week_id": [1, 1, 2, 2],
         "item_id": ["1", "2", "1", "2"],
         "clicks": [1, 2, 3, None],
         "impressions": [10, 12, None, 14],
@@ -775,7 +775,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
           design=design,
           item_id_column="item_id",
           date_column="date",
-          date_id_column="date_id",
+          week_id_column="week_id",
           metric_columns=["clicks", "impressions"],
           experiment_start_date="2023-10-01",
           treatment_assignment_column="treatment_assignment",
@@ -789,7 +789,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         "date": pd.to_datetime(
             ["2023-10-01", "2023-10-01", "2023-10-03", "2023-10-03"]
         ),
-        "date_id": [1, 1, 2, 2],
+        "week_id": [1, 1, 2, 2],
         "item_id": ["1", "2", "1", "2"],
         "clicks": [1, 2, 3, 4],
         "impressions": [10, 12, 13, 14],
@@ -808,21 +808,21 @@ class ValidateExperimentDataTests(parameterized.TestCase):
           design=design,
           item_id_column="item_id",
           date_column="date",
-          date_id_column="date_id",
+          week_id_column="week_id",
           metric_columns=["clicks", "impressions"],
           experiment_start_date="2023-10-01",
           treatment_assignment_column="treatment_assignment",
       )
 
   @mock_experiment_design_validation
-  def test_experiment_data_date_id_must_be_aligned_with_date(
+  def test_experiment_data_week_id_must_be_aligned_with_date(
       self, mock_experiment_design
   ):
     bad_experiment_data = pd.DataFrame({
         "date": pd.to_datetime(
             ["2023-10-01", "2023-10-01", "2023-10-03", "2023-10-03"]
         ),
-        "date_id": [2, 2, 1, 1],
+        "week_id": [2, 2, 1, 1],
         "item_id": ["1", "2", "1", "2"],
         "clicks": [1, 2, 3, 4],
         "impressions": [10, 12, 13, 14],
@@ -841,7 +841,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
           design=design,
           item_id_column="item_id",
           date_column="date",
-          date_id_column="date_id",
+          week_id_column="week_id",
           metric_columns=["clicks", "impressions"],
           experiment_start_date="2023-10-01",
           treatment_assignment_column="treatment_assignment",
@@ -855,7 +855,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         "date": pd.to_datetime(
             ["2023-10-01", "2023-10-01", "2023-10-02", "2023-10-02"]
         ),
-        "date_id": [1, 1, 2, 2],
+        "week_id": [1, 1, 2, 2],
         "item_id": ["1", "2", "1", "2"],
         "clicks": [1, 2, 3, np.inf],
         "impressions": [10, 12, np.inf, 14],
@@ -874,7 +874,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
           design=design,
           item_id_column="item_id",
           date_column="date",
-          date_id_column="date_id",
+          week_id_column="week_id",
           metric_columns=["clicks", "impressions"],
           experiment_start_date="2023-10-01",
           treatment_assignment_column="treatment_assignment",
@@ -888,7 +888,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         "date": pd.to_datetime(
             ["2023-10-01", "2023-10-01", "2023-10-02", "2023-10-02"]
         ),
-        "date_id": [1, 1, 2, 2],
+        "week_id": [1, 1, 2, 2],
         "item_id": ["1", "2", "1", "2"],
         "clicks": [1, 2, 3, -1],
         "impressions": [10, 12, 13, 14],
@@ -907,7 +907,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
           design=design,
           item_id_column="item_id",
           date_column="date",
-          date_id_column="date_id",
+          week_id_column="week_id",
           metric_columns=["clicks", "impressions"],
           experiment_start_date="2023-10-01",
           treatment_assignment_column="treatment_assignment",
@@ -919,7 +919,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         "date": pd.to_datetime(
             ["2023-10-01", "2023-10-01", "2023-10-02", "2023-10-02"]
         ),
-        "date_id": [1, 1, 2, 2],
+        "week_id": [1, 1, 2, 2],
         "item_id": ["1", "2", "1", "2"],
         "clicks": [1, 2, 3, 4],
         "impressions": [10, 12, 13, 14],
@@ -937,7 +937,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
           design=design,
           item_id_column="item_id",
           date_column="date",
-          date_id_column="date_id",
+          week_id_column="week_id",
           metric_columns=["clicks", "impressions"],
           experiment_start_date="2023-10-01",
           treatment_assignment_column="treatment_assignment",
@@ -951,7 +951,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         "date": pd.to_datetime(
             ["2023-10-01", "2023-10-01", "2023-10-08", "2023-10-08"]
         ),
-        "date_id": [1, 1, 2, 2],
+        "week_id": [1, 1, 2, 2],
         "item_id": ["1", "2", "1", "2"],
         "clicks": [1, 2, 3, -1],
         "impressions": [10, 12, 13, 14],
@@ -969,7 +969,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         design=design,
         item_id_column="item_id",
         date_column="date",
-        date_id_column="date_id",
+        week_id_column="week_id",
         metric_columns=["clicks", "impressions"],
         can_be_negative_metric_columns=["clicks"],
         experiment_start_date="2023-10-01",
@@ -977,14 +977,14 @@ class ValidateExperimentDataTests(parameterized.TestCase):
     )
 
   @mock_experiment_design_validation
-  def test_experiment_data_date_id_must_be_consecutive(
+  def test_experiment_data_week_id_must_be_consecutive(
       self, mock_experiment_design
   ):
     bad_experiment_data = pd.DataFrame({
         "date": pd.to_datetime(
             ["2023-10-01", "2023-10-01", "2023-10-02", "2023-10-02"]
         ),
-        "date_id": [1, 1, 3, 3],
+        "week_id": [1, 1, 3, 3],
         "item_id": ["1", "2", "1", "2"],
         "clicks": [1, 2, 3, 1],
         "treatment_assignment": [0, 1, 0, 1],
@@ -1002,21 +1002,21 @@ class ValidateExperimentDataTests(parameterized.TestCase):
           design=design,
           item_id_column="item_id",
           date_column="date",
-          date_id_column="date_id",
+          week_id_column="week_id",
           metric_columns=["clicks", "impressions"],
           experiment_start_date="2023-10-01",
           treatment_assignment_column="treatment_assignment",
       )
 
   @mock_experiment_design_validation
-  def test_experiment_data_date_id_must_be_an_integer(
+  def test_experiment_data_week_id_must_be_an_integer(
       self, mock_experiment_design
   ):
     bad_experiment_data = pd.DataFrame({
         "date": pd.to_datetime(
             ["2023-10-01", "2023-10-01", "2023-10-02", "2023-10-02"]
         ),
-        "date_id": ["1", "1", "2", "2"],
+        "week_id": ["1", "1", "2", "2"],
         "item_id": ["1", "2", "1", "2"],
         "clicks": [1, 2, 3, 1],
         "treatment_assignment": [0, 1, 0, 1],
@@ -1034,7 +1034,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
           design=design,
           item_id_column="item_id",
           date_column="date",
-          date_id_column="date_id",
+          week_id_column="week_id",
           metric_columns=["clicks", "impressions"],
           experiment_start_date="2023-10-01",
           treatment_assignment_column="treatment_assignment",
@@ -1046,7 +1046,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         "date": pd.to_datetime(
             ["2023-10-01", "2023-10-01", "2023-10-08", "2023-10-08"]
         ),
-        "date_id": [1, 1, 2, 2],
+        "week_id": [1, 1, 2, 2],
         "item_id": ["1", "2", "1", "2"],
         "clicks": [1, 2, 3, 4],
         "impressions": [10, 12, 13, 14],
@@ -1064,7 +1064,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
           design=design,
           item_id_column="item_id",
           date_column="date",
-          date_id_column="date_id",
+          week_id_column="week_id",
           metric_columns=["clicks", "impressions"],
           experiment_start_date="2023-10-01",
           treatment_assignment_column="treatment_assignment",
@@ -1076,7 +1076,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         "date": pd.to_datetime(
             ["2023-10-01", "2023-10-01", "2023-10-08", "2023-10-08"]
         ),
-        "date_id": [1, 1, 2, 2],
+        "week_id": [1, 1, 2, 2],
         "item_id": ["1", "2", "1", "2"],
         "clicks": [1, 2, 3, 4],
         "impressions": [10, 12, 13, 14],
@@ -1094,7 +1094,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
           design=design,
           item_id_column="item_id",
           date_column="date",
-          date_id_column="date_id",
+          week_id_column="week_id",
           metric_columns=["clicks", "impressions"],
           experiment_start_date="2023-10-01",
           treatment_assignment_column="treatment_assignment",
@@ -1108,7 +1108,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         "date": pd.to_datetime(
             ["2023-10-01", "2023-10-01", "2023-10-08", "2023-10-08"]
         ),
-        "date_id": [1, 1, 2, 2],
+        "week_id": [1, 1, 2, 2],
         "item_id": ["1", "2", "1", "2"],
         "clicks": [1, 2, 3, 4],
         "impressions": [10, 12, 13, 14],
@@ -1125,7 +1125,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         design=design,
         item_id_column="item_id",
         date_column="date",
-        date_id_column="date_id",
+        week_id_column="week_id",
         metric_columns=["clicks", "impressions"],
         experiment_start_date="2023-10-01",
         experiment_has_concluded=False,
@@ -1140,7 +1140,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         "date": pd.to_datetime(
             ["2023-10-01", "2023-10-01", "2023-10-08", "2023-10-08"]
         ),
-        "date_id": [1, 1, 2, 2],
+        "week_id": [1, 1, 2, 2],
         "item_id": ["1", "2", "1", "2"],
         "clicks": [1, 2, 3, 4],
         "impressions": [10, 12, 13, 14],
@@ -1158,7 +1158,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
           design=design,
           item_id_column="item_id",
           date_column="date",
-          date_id_column="date_id",
+          week_id_column="week_id",
           metric_columns=["impressions"],
           experiment_start_date="2023-10-01",
           treatment_assignment_column="treatment_assignment",
@@ -1172,7 +1172,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         "date": pd.to_datetime(
             ["2023-10-01", "2023-10-01", "2023-10-08", "2023-10-08"]
         ),
-        "date_id": [1, 1, 2, 2],
+        "week_id": [1, 1, 2, 2],
         "item_id": ["1", "2", "1", "2"],
         "clicks": [1, 2, 3, 4],
         "impressions": [10, 12, 13, 14],
@@ -1190,7 +1190,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
           design=design,
           item_id_column="item_id",
           date_column="date",
-          date_id_column="date_id",
+          week_id_column="week_id",
           metric_columns=["clicks", "impressions"],
           experiment_start_date="2023-10-01",
           treatment_assignment_column="treatment_assignment",
@@ -1204,7 +1204,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         "date": pd.to_datetime(
             ["2023-10-01", "2023-10-01", "2023-10-08", "2023-10-08"]
         ),
-        "date_id": [1, 1, 2, 2],
+        "week_id": [1, 1, 2, 2],
         "item_id": ["1", "2", "1", "2"],
         "clicks": [1, 2, 3, 4],
         "impressions": [10, 12, 13, 14],
@@ -1222,7 +1222,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
           design=design,
           item_id_column="item_id",
           date_column="date",
-          date_id_column="date_id",
+          week_id_column="week_id",
           metric_columns=["clicks", "impressions"],
           experiment_start_date="2023-10-01",
           treatment_assignment_column="treatment_assignment",
@@ -1234,7 +1234,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         "date": pd.to_datetime(
             ["2023-10-01", "2023-10-01", "2023-10-08", "2023-10-08"]
         ),
-        "date_id": [1, 1, 2, 2],
+        "week_id": [1, 1, 2, 2],
         "item_id": ["1", "2", "1", "2"],
         "clicks": [1, 2, 3, 4],
         "impressions": [10, 12, 13, 14],
@@ -1255,7 +1255,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
           design=design,
           item_id_column="item_id",
           date_column="date",
-          date_id_column="date_id",
+          week_id_column="week_id",
           metric_columns=["clicks", "impressions"],
           experiment_start_date="2023-10-01",
           treatment_assignment_column="treatment_assignment",
