@@ -23,28 +23,169 @@ ExperimentDesign = experiment_design.ExperimentDesign
 
 
 def get_weeks_between(
-    week_number: pd.Series, start_id: int, end_id: int
+    week_id: pd.Series, start_id: int, end_id: int
 ) -> pd.Series:
-  """Computes a boolean array indicating if the week number is between start_id
+  """Returns a boolean array, true if week_id is within the range.
 
-      and end_id (inclusive).
+  Returns true if the week_id is between start_id and end_id (both inclusive).
 
   This function will be used to assign treatment time to items based on the
   selected number of runtime weeks and regular vs crossover experiment.
 
   Args:
-    week_number: week number associated with a specific date in the dataset.
+    week_id: week id associated with a specific date in the dataset.
     start_id: integer value representing the starting point of a test phase.
     end_id: integer value representing the ending point of a test phase.
+  """
+  greater = week_id >= start_id
+  less = week_id <= end_id
+  return greater & less
+
+
+def _add_time_period_column_for_regular_experiment(
+    data: pd.DataFrame,
+    *,
+    start_week_id: int,
+    pretest_weeks: int,
+    runtime_weeks: int,
+    week_id_column: str,
+    time_period_column: str = "time_period",
+) -> pd.DataFrame:
+  """Adds the time_period_column to the data for a regular experiment."""
+  is_pretest = get_weeks_between(
+      data[week_id_column],
+      start_week_id - pretest_weeks,
+      start_week_id - 1,
+  )
+  is_test = get_weeks_between(
+      data[week_id_column],
+      start_week_id,
+      start_week_id + runtime_weeks - 1,
+  )
+  data[time_period_column] = None
+  data.loc[is_pretest, time_period_column] = "pretest"
+  data.loc[is_test, time_period_column] = "test"
+  return data
+
+
+def _add_time_period_column_for_crossover_experiment(
+    data: pd.DataFrame,
+    *,
+    start_week_id: int,
+    pretest_weeks: int,
+    runtime_weeks: int,
+    crossover_washout_weeks: int,
+    week_id_column: str,
+    time_period_column: str = "time_period",
+) -> pd.DataFrame:
+  """Adds the time_period_column to the data for a crossover experiment."""
+  test_period_weeks = (runtime_weeks - 2 * crossover_washout_weeks) // 2
+  pretest_start_week = start_week_id - pretest_weeks
+  post_washout_period_1_start = start_week_id + crossover_washout_weeks
+  period_1_end = post_washout_period_1_start + test_period_weeks - 1
+  post_washout_period_2_start = period_1_end + 1 + crossover_washout_weeks
+  period_2_end = post_washout_period_2_start + test_period_weeks - 1
+
+  is_pretest = get_weeks_between(
+      data[week_id_column], pretest_start_week, start_week_id - 1
+  )
+  is_washout_1 = get_weeks_between(
+      data[week_id_column],
+      start_week_id,
+      post_washout_period_1_start - 1,
+  )
+  is_test_1 = get_weeks_between(
+      data[week_id_column],
+      post_washout_period_1_start,
+      period_1_end,
+  )
+  is_washout_2 = get_weeks_between(
+      data[week_id_column],
+      period_1_end + 1,
+      post_washout_period_2_start - 1,
+  )
+  is_test_2 = get_weeks_between(
+      data[week_id_column],
+      post_washout_period_2_start,
+      period_2_end,
+  )
+  data[time_period_column] = None
+  data.loc[is_pretest, time_period_column] = "pretest"
+  data.loc[is_washout_1, time_period_column] = "washout_1"
+  data.loc[is_test_1, time_period_column] = "test_1"
+  data.loc[is_washout_2, time_period_column] = "washout_2"
+  data.loc[is_test_2, time_period_column] = "test_2"
+
+  return data
+
+
+def add_time_period_column(
+    data: pd.DataFrame,
+    *,
+    design: ExperimentDesign,
+    start_week_id: int,
+    week_id_column: str,
+    time_period_column: str = "time_period",
+):
+  """Adds the time_period_column to the data.
+
+  If the experiment is a crossover design then the time_period is either pretest
+  (for the period before the test began), washout_1 (for the first period of the
+  runtime to exclude from the analysis), test_1 (for the first period during
+  the experiment, before the crossover), washout_2 (for the first period after
+  the crossover to exclude from the analysis) or test_2 (for the second period
+  during the experiment, after the crossover). It is None if it's none of those
+  periods.
+
+  If the experiment is a regular (non-crossover) design then the time_period is
+  either pretest (for the period before the test began), or test (for the period
+  during the experiment). It is None if it's none of those periods.
+
+  The values are the average of the metric per week during the time_period.
+
+  Args:
+    data: The data from the experiment to be pivoted.
+    design: The design of the experiment, containing the number of weeks to use
+      for the pretest, runtime and washout periods and whether it's a crossover
+      design.
+    start_week_id: The id of the first week of the experiment (inclusive).
+    week_id_column: The column identifying individual weeks.
+    time_period_column: The output column name containing the assigned time
+      period. Defaults to "time_period".
 
   Returns:
-    True or false if the week number is between start_id and end_id indicating a
-      specific test phase. This result will assign the corresponding test phase
-      to items.
+    The data with the time period column added.
+
+  Raises:
+    ValueError: If the time_period_column exists in the data, or if the
+      week_id_column is missing from the data.
   """
-  greater = week_number >= start_id
-  less = week_number <= end_id
-  return greater & less
+  if time_period_column in data.columns:
+    raise ValueError(
+        "time_period_column must not already be a column in the data."
+    )
+  if week_id_column not in data.columns:
+    raise ValueError("week_id_column must be a column in the data.")
+
+  if design.is_crossover:
+    return _add_time_period_column_for_crossover_experiment(
+        data,
+        start_week_id=start_week_id,
+        pretest_weeks=design.pretest_weeks,
+        runtime_weeks=design.runtime_weeks,
+        crossover_washout_weeks=design.crossover_washout_weeks,
+        week_id_column=week_id_column,
+        time_period_column=time_period_column,
+    )
+  else:
+    return _add_time_period_column_for_regular_experiment(
+        data,
+        start_week_id=start_week_id,
+        pretest_weeks=design.pretest_weeks,
+        runtime_weeks=design.runtime_weeks,
+        week_id_column=week_id_column,
+        time_period_column=time_period_column,
+    )
 
 
 def _pivot_regular_time_assignment(
@@ -90,19 +231,14 @@ def _pivot_regular_time_assignment(
     The pivoted data, where rows are randomisation units, and columns are
     combinations of metrics and time_periods.
   """
-  is_pretest = get_weeks_between(
-      data[week_id_column],
-      start_week_id - pretest_weeks,
-      start_week_id - 1,
+  data = _add_time_period_column_for_regular_experiment(
+      data,
+      start_week_id=start_week_id,
+      pretest_weeks=pretest_weeks,
+      runtime_weeks=runtime_weeks,
+      week_id_column=week_id_column,
+      time_period_column=time_period_column,
   )
-  is_test = get_weeks_between(
-      data[week_id_column],
-      start_week_id,
-      start_week_id + runtime_weeks - 1,
-  )
-  data[time_period_column] = None
-  data.loc[is_pretest, time_period_column] = "pretest"
-  data.loc[is_test, time_period_column] = "test"
 
   index_columns = [item_id_column]
   if treatment_column:
@@ -175,36 +311,16 @@ def _pivot_crossover_time_assignment(
     The pivoted data, where rows are randomisation units, and columns are
     combinations of metrics and time_periods.
   """
-  test_period_weeks = (
-      runtime_weeks - 2 * crossover_washout_weeks
-  ) // 2
-  pretest_start_week = start_week_id - pretest_weeks
-  post_washout_period_1_start = (
-      start_week_id + crossover_washout_weeks
+  data = _add_time_period_column_for_crossover_experiment(
+      data,
+      start_week_id=start_week_id,
+      pretest_weeks=pretest_weeks,
+      runtime_weeks=runtime_weeks,
+      crossover_washout_weeks=crossover_washout_weeks,
+      week_id_column=week_id_column,
+      time_period_column=time_period_column,
   )
-  period_1_end = post_washout_period_1_start + test_period_weeks - 1
-  post_washout_period_2_start = (
-      period_1_end + 1 + crossover_washout_weeks
-  )
-  period_2_end = post_washout_period_2_start + test_period_weeks - 1
-
-  is_pretest = get_weeks_between(
-      data[week_id_column], pretest_start_week, start_week_id - 1
-  )
-  is_test_1 = get_weeks_between(
-      data[week_id_column],
-      post_washout_period_1_start,
-      period_1_end,
-  )
-  is_test_2 = get_weeks_between(
-      data[week_id_column],
-      post_washout_period_2_start,
-      period_2_end,
-  )
-  data[time_period_column] = None
-  data.loc[is_pretest, time_period_column] = "pretest"
-  data.loc[is_test_1, time_period_column] = "test_1"
-  data.loc[is_test_2, time_period_column] = "test_2"
+  test_period_weeks = (runtime_weeks - 2 * crossover_washout_weeks) // 2
 
   index_columns = [item_id_column]
   if treatment_column:
@@ -222,8 +338,18 @@ def _pivot_crossover_time_assignment(
   if "pretest" in pivoted_data.columns.get_level_values(1):
     pivoted_data.loc[:, pd.IndexSlice[:, "pretest"]] /= pretest_weeks
 
-  pivoted_data.loc[:, pd.IndexSlice[:, "test_1"]] /= test_period_weeks
-  pivoted_data.loc[:, pd.IndexSlice[:, "test_2"]] /= test_period_weeks
+  if "test_1" in pivoted_data.columns.get_level_values(1):
+    pivoted_data.loc[:, pd.IndexSlice[:, "test_1"]] /= test_period_weeks
+  if "test_2" in pivoted_data.columns.get_level_values(1):
+    pivoted_data.loc[:, pd.IndexSlice[:, "test_2"]] /= test_period_weeks
+  if "washout_1" in pivoted_data.columns.get_level_values(1):
+    pivoted_data.loc[
+        :, pd.IndexSlice[:, "washout_1"]
+    ] /= crossover_washout_weeks
+  if "washout_2" in pivoted_data.columns.get_level_values(1):
+    pivoted_data.loc[
+        :, pd.IndexSlice[:, "washout_2"]
+    ] /= crossover_washout_weeks
 
   data.drop(columns=[time_period_column], inplace=True)
 

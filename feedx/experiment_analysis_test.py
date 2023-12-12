@@ -270,6 +270,171 @@ class ExperimentAnalysisTest(parameterized.TestCase):
     pd.testing.assert_frame_equal(data, original_data_copy)
 
 
+class AddTimePeriodColumnTests(parameterized.TestCase):
+
+  def setUp(self):
+    super().setUp()
+    self.data = pd.DataFrame({
+        "week_id": [-2, -1, 0, 1, 2, 3, 4],
+    })
+    self.irrelevant_design_args = dict(
+        n_items_before_trimming=1000,
+        primary_metric="clicks",
+        pre_trim_top_percentile=0.0,
+        pre_trim_bottom_percentile=0.0,
+        post_trim_percentile=0.1,
+    )
+
+  def test_expected_time_period_added_for_regular_experiment_without_pretest(
+      self,
+  ):
+    design = experiment_design.ExperimentDesign(
+        is_crossover=False,
+        runtime_weeks=4,
+        pretest_weeks=0,
+        **self.irrelevant_design_args
+    )
+
+    actual_output = experiment_analysis.add_time_period_column(
+        self.data,
+        design=design,
+        start_week_id=0,
+        week_id_column="week_id",
+    )
+
+    expected_output = pd.DataFrame({
+        "week_id": [-2, -1, 0, 1, 2, 3, 4],
+        "time_period": [None, None, "test", "test", "test", "test", None],
+    })
+    pd.testing.assert_frame_equal(
+        actual_output, expected_output, check_like=True
+    )
+
+  def test_expected_time_period_added_for_regular_experiment_with_pretest(self):
+    design = experiment_design.ExperimentDesign(
+        is_crossover=False,
+        runtime_weeks=4,
+        pretest_weeks=2,
+        **self.irrelevant_design_args
+    )
+
+    actual_output = experiment_analysis.add_time_period_column(
+        self.data,
+        design=design,
+        start_week_id=0,
+        week_id_column="week_id",
+    )
+
+    expected_output = pd.DataFrame({
+        "week_id": [-2, -1, 0, 1, 2, 3, 4],
+        "time_period": [
+            "pretest",
+            "pretest",
+            "test",
+            "test",
+            "test",
+            "test",
+            None,
+        ],
+    })
+    pd.testing.assert_frame_equal(
+        actual_output, expected_output, check_like=True
+    )
+
+  def test_expected_time_period_added_for_crossover_experiment_without_pretest(
+      self,
+  ):
+    design = experiment_design.ExperimentDesign(
+        is_crossover=True,
+        runtime_weeks=4,
+        pretest_weeks=0,
+        crossover_washout_weeks=1,
+        **self.irrelevant_design_args
+    )
+
+    actual_output = experiment_analysis.add_time_period_column(
+        self.data,
+        design=design,
+        start_week_id=0,
+        week_id_column="week_id",
+    )
+
+    expected_output = pd.DataFrame({
+        "week_id": [-2, -1, 0, 1, 2, 3, 4],
+        "time_period": [
+            None,
+            None,
+            "washout_1",
+            "test_1",
+            "washout_2",
+            "test_2",
+            None,
+        ],
+    })
+    pd.testing.assert_frame_equal(
+        actual_output, expected_output, check_like=True
+    )
+
+  def test_expected_time_period_added_for_crossover_experiment_with_pretest(
+      self,
+  ):
+    design = experiment_design.ExperimentDesign(
+        is_crossover=True,
+        runtime_weeks=4,
+        pretest_weeks=2,
+        crossover_washout_weeks=1,
+        **self.irrelevant_design_args
+    )
+
+    actual_output = experiment_analysis.add_time_period_column(
+        self.data,
+        design=design,
+        start_week_id=0,
+        week_id_column="week_id",
+    )
+
+    expected_output = pd.DataFrame({
+        "week_id": [-2, -1, 0, 1, 2, 3, 4],
+        "time_period": [
+            "pretest",
+            "pretest",
+            "washout_1",
+            "test_1",
+            "washout_2",
+            "test_2",
+            None,
+        ],
+    })
+    pd.testing.assert_frame_equal(
+        actual_output, expected_output, check_like=True
+    )
+
+  def test_experiment_start_is_aligned_on_start_week_id(
+      self,
+  ):
+    design = experiment_design.ExperimentDesign(
+        is_crossover=False,
+        runtime_weeks=4,
+        pretest_weeks=0,
+        **self.irrelevant_design_args
+    )
+
+    actual_output = experiment_analysis.add_time_period_column(
+        self.data,
+        design=design,
+        start_week_id=1,
+        week_id_column="week_id",
+    )
+
+    expected_output = pd.DataFrame({
+        "week_id": [-2, -1, 0, 1, 2, 3, 4],
+        "time_period": [None, None, None, "test", "test", "test", "test"],
+    })
+    pd.testing.assert_frame_equal(
+        actual_output, expected_output, check_like=True
+    )
+
+
 class PivotTimeAssignmentTest(parameterized.TestCase):
 
   def setUp(self):
@@ -544,9 +709,9 @@ class PivotTimeAssignmentTest(parameterized.TestCase):
     )
     # Design:
     # Week -2, -1:  pretest
-    # Week 0:       washout
+    # Week 0:       washout_1
     # Week 1, 2:    test_1
-    # Week 3:       washout
+    # Week 3:       washout_2
     # Week 4, 5:    test_2
 
     pivoted_data = experiment_analysis.pivot_time_assignment(
@@ -559,12 +724,18 @@ class PivotTimeAssignmentTest(parameterized.TestCase):
     )
     expected_pivot_data = self.make_expected_pivot_data(
         pretest=[-2, -1],
+        washout_1=[0],
         test_1=[1, 2],
+        washout_2=[3],
         test_2=[4, 5],
     )
 
     pd.testing.assert_frame_equal(
-        pivoted_data, expected_pivot_data, check_names=False, check_dtype=False
+        pivoted_data,
+        expected_pivot_data,
+        check_names=False,
+        check_dtype=False,
+        check_like=True,
     )
 
   def test_pivot_time_assignment_for_crossover_experiment_with_longer_washout(
@@ -579,9 +750,9 @@ class PivotTimeAssignmentTest(parameterized.TestCase):
     )
     # Design:
     # Week -2, -1:  pretest
-    # Week 0, 1:    washout
+    # Week 0, 1:    washout_1
     # Week 2:       test_1
-    # Week 3, 4:    washout
+    # Week 3, 4:    washout_2
     # Week 5:       test_2
 
     pivoted_data = experiment_analysis.pivot_time_assignment(
@@ -594,12 +765,18 @@ class PivotTimeAssignmentTest(parameterized.TestCase):
     )
     expected_pivot_data = self.make_expected_pivot_data(
         pretest=[-2, -1],
+        washout_1=[0, 1],
         test_1=[2],
+        washout_2=[3, 4],
         test_2=[5],
     )
 
     pd.testing.assert_frame_equal(
-        pivoted_data, expected_pivot_data, check_names=False, check_dtype=False
+        pivoted_data,
+        expected_pivot_data,
+        check_names=False,
+        check_dtype=False,
+        check_like=True,
     )
 
   def test_pivot_time_assignment_for_crossover_experiment_without_pretest(self):
@@ -611,9 +788,9 @@ class PivotTimeAssignmentTest(parameterized.TestCase):
         **self.irrelevant_design_args
     )
     # Design:
-    # Week 0:       washout
+    # Week 0:       washout_1
     # Week 1, 2:    test_1
-    # Week 3:       washout
+    # Week 3:       washout_2
     # Week 4, 5:    test_2
 
     pivoted_data = experiment_analysis.pivot_time_assignment(
@@ -625,12 +802,18 @@ class PivotTimeAssignmentTest(parameterized.TestCase):
         week_id_column="week_id",
     )
     expected_pivot_data = self.make_expected_pivot_data(
+        washout_1=[0],
         test_1=[1, 2],
+        washout_2=[3],
         test_2=[4, 5],
     )
 
     pd.testing.assert_frame_equal(
-        pivoted_data, expected_pivot_data, check_names=False, check_dtype=False
+        pivoted_data,
+        expected_pivot_data,
+        check_names=False,
+        check_dtype=False,
+        check_like=True,
     )
 
   def test_pivot_time_assignment_for_crossover_experiment_with_shorter_runtime(
@@ -645,9 +828,9 @@ class PivotTimeAssignmentTest(parameterized.TestCase):
     )
     # Design:
     # Week -2, -1:  pretest
-    # Week 0:       washout
+    # Week 0:       washout_1
     # Week 1:       test_1
-    # Week 2:       washout
+    # Week 2:       washout_2
     # Week 3:       test_2
 
     pivoted_data = experiment_analysis.pivot_time_assignment(
@@ -660,12 +843,18 @@ class PivotTimeAssignmentTest(parameterized.TestCase):
     )
     expected_pivot_data = self.make_expected_pivot_data(
         pretest=[-2, -1],
+        washout_1=[0],
         test_1=[1],
+        washout_2=[2],
         test_2=[3],
     )
 
     pd.testing.assert_frame_equal(
-        pivoted_data, expected_pivot_data, check_names=False, check_dtype=False
+        pivoted_data,
+        expected_pivot_data,
+        check_names=False,
+        check_dtype=False,
+        check_like=True,
     )
 
   @parameterized.parameters([True, False])
