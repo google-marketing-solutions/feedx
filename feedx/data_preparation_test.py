@@ -714,5 +714,29 @@ class GroupDataToCompleteWeeksTests(parameterized.TestCase):
       )
 
 
+class AtLeastOneMetricTest(parameterized.TestCase):
+
+  def test_add_at_least_one_metrics_adds_expected_columns(self):
+    data = pd.DataFrame({"clicks": [0, 1, 0, 3], "impressions": [0, 3, 1, 5]})
+
+    actual_result = data_preparation.add_at_least_one_metrics(
+        data,
+        metrics={
+            "clicks": "at_least_one_click",
+            "impressions": "at_least_one_impression",
+        },
+    )
+
+    expected_result = pd.DataFrame({
+        "clicks": [0, 1, 0, 3],
+        "impressions": [0, 3, 1, 5],
+        "at_least_one_click": [0, 1, 0, 1],
+        "at_least_one_impression": [0, 1, 1, 1],
+    })
+    pd.testing.assert_frame_equal(
+        actual_result, expected_result, check_like=True
+    )
+
+
 if __name__ == "__main__":
   absltest.main()

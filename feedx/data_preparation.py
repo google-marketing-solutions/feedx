@@ -791,3 +791,33 @@ def validate_historical_data(
       metric_columns=[primary_metric_column],
       required=require_positive_primary_metric,
   )
+
+
+def add_at_least_one_metrics(
+    data: pd.DataFrame, metrics: dict[str, str]
+) -> pd.DataFrame:
+  """Returns the data with the "at least one" metrics added.
+
+  The at least one metrics are binomial metrics, which are 1 when the metric
+  is greater than 0, and 0 otherwise. They are useful, for example, for testing
+  the impact on zombie items that typically get very few clicks or impressions.
+
+  It will print a warning if the at least one metric is constant (all 0s or all
+  1s). In this case you should not use that metric - it won't work in the
+  analysis.
+
+  Args:
+    data: The data to add the "at least one metrics" to.
+    metrics: A mapping between the original column name and the new column name
+      for the "at least one" metric. For example, to calculate
+      at_least_one_click from clicks you would set metrics = {"clicks":
+      "at_least_one_click"}.
+  """
+  for metric, at_least_one_metric in metrics.items():
+    if np.all(data[metric] > 0) | np.all(data[metric] <= 0):
+      print(
+          f"WARNING: {at_least_one_metric} is constant, it won't be useful to"
+          " analyse."
+      )
+    data[at_least_one_metric] = (data[metric] > 0).astype(int)
+  return data
