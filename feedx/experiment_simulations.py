@@ -286,28 +286,39 @@ def apply_random_treatment_assignment(
 
 
 def _apply_synthetic_treatment_effect_to_regular_experiment(
-    pivoted_data: pd.DataFrame, effect_size: float, treatment_column: str
+    pivoted_data: pd.DataFrame,
+    metric_name: str,
+    effect_size: float,
+    treatment_assignment_index_name: str,
 ) -> pd.DataFrame:
-  is_treated = pivoted_data[treatment_column] == 1
-  pivoted_data.loc[is_treated, "test"] += effect_size
+  is_treated = (
+      pivoted_data.index.get_level_values(treatment_assignment_index_name) == 1
+  )
+  pivoted_data.loc[is_treated, (metric_name, "test")] += effect_size
   return pivoted_data
 
 
 def _apply_synthetic_treatment_effect_to_crossover_experiment(
-    pivoted_data: pd.DataFrame, effect_size: float, treatment_column: str
+    pivoted_data: pd.DataFrame,
+    metric_name: str,
+    effect_size: float,
+    treatment_assignment_index_name: str,
 ) -> pd.DataFrame:
-  is_treated = pivoted_data[treatment_column] == 1
-  pivoted_data.loc[is_treated, "test_1"] += effect_size
-  pivoted_data.loc[~is_treated, "test_2"] += effect_size
+  is_treated = (
+      pivoted_data.index.get_level_values(treatment_assignment_index_name) == 1
+  )
+  pivoted_data.loc[is_treated, (metric_name, "test_1")] += effect_size
+  pivoted_data.loc[~is_treated, (metric_name, "test_2")] += effect_size
   return pivoted_data
 
 
 def apply_synthetic_treatment_effect(
     pivoted_data: pd.DataFrame,
     *,
+    metric_name: str,
     design: ExperimentDesign,
     effect_size: float,
-    treatment_column: str,
+    treatment_assignment_index_name: str,
 ) -> pd.DataFrame:
   """Applies the synthetic treatment effect to the dataframe.
 
@@ -319,18 +330,20 @@ def apply_synthetic_treatment_effect(
 
   The synthetic treatment will increase the metric by the effect_size for
   treatment when they have treatment applied. For a regular experiment, this
-  is all the items where treatment_column = 1. For a crossover experiment, this
-  is all the items where treatment_column = 1 for test_1, and all the columns
+  is all the items where treatment = 1. For a crossover experiment, this
+  is all the items where treatment = 1 for test_1, and all the columns
   where treatment_column = 0 for test_2.
 
   Args:
     pivoted_data: The dataframe to apply the synthetic treatment to. Must
       include the treatment_column, as well as "test" if it is not a crossover
       design, or "test_1" and "test_2" if it is a crossover design.
+    metric_name: The metric to apply the synthetic treatment effect to.
     design: The experiment design being simulated, with the is_crossover
       attribute dictating whether this is a crossover design or regular design.
     effect_size: The effect size to apply to the metric when it is treated.
-    treatment_column: The column name that has the treatment status in the data.
+    treatment_assignment_index_name: The index level name that has the treatment
+      status in the data.
 
   Returns:
     The dataframe with the synthetic treatment effect applied.
@@ -338,11 +351,15 @@ def apply_synthetic_treatment_effect(
   Raises:
     ValueError: If the pivoted_data is missing any required columns.
   """
-  required_columns = {treatment_column}
+  if treatment_assignment_index_name not in pivoted_data.index.names:
+    raise ValueError(
+        "The pivoted_data does not contain the treatment_assignment_index_name."
+    )
+
   if design.is_crossover:
-    required_columns.update({"test_1", "test_2"})
+    required_columns = {(metric_name, "test_1"), (metric_name, "test_2")}
   else:
-    required_columns.add("test")
+    required_columns = {(metric_name, "test")}
 
   missing_columns = required_columns - set(pivoted_data.columns)
   if missing_columns:
@@ -353,11 +370,11 @@ def apply_synthetic_treatment_effect(
 
   if design.is_crossover:
     return _apply_synthetic_treatment_effect_to_crossover_experiment(
-        pivoted_data, effect_size, treatment_column
+        pivoted_data, metric_name, effect_size, treatment_assignment_index_name
     )
   else:
     return _apply_synthetic_treatment_effect_to_regular_experiment(
-        pivoted_data, effect_size, treatment_column
+        pivoted_data, metric_name, effect_size, treatment_assignment_index_name
     )
 
 
@@ -523,7 +540,7 @@ class SimulationAnalysis:
         item_id_column=self.item_id_column,
         week_id_column=self.week_id_column,
         time_period_column=self.time_period_column,
-    )[self.design.primary_metric]
+    )
 
     if bootstrap_sample:
       pivoted_data = _bootstrap_sample_data(
@@ -542,7 +559,7 @@ class SimulationAnalysis:
     if self.design.pretest_weeks > 0:
       pivoted_data = experiment_design.trim_outliers(
           pivoted_data,
-          order_by="pretest",
+          order_by=(self.design.primary_metric, "pretest"),
           trim_percentile_top=self.design.pre_trim_top_percentile,
           trim_percentile_bottom=self.design.pre_trim_bottom_percentile,
           rng=self.rng,
@@ -581,7 +598,7 @@ class SimulationAnalysis:
     """
     pivoted_data = self._get_pivoted_and_trimmed_historical_data(
         start_week_id, bootstrap_sample=False
-    )
+    )[self.design.primary_metric]
 
     if self.design.is_crossover:
       stacked_values = np.stack([
@@ -832,24 +849,32 @@ class SimulationAnalysis:
               item_id_column=self.item_id_column,
               treatment_column=self.treatment_column,
           )
+          .set_index([self.item_id_column, self.treatment_column])
       )
 
       aa_simulation_results_list.append(
           experiment_analysis.analyze_experiment(
-              simulated_aa_test_data, self.design
+              simulated_aa_test_data,
+              design=self.design,
+              metric_name=self.design.primary_metric,
+              treatment_assignment_index_name=self.treatment_column,
           )
       )
 
       simulated_ab_test_data = apply_synthetic_treatment_effect(
           simulated_aa_test_data,
+          metric_name=self.design.primary_metric,
           design=self.design,
           effect_size=self.minimum_detectable_effect,
-          treatment_column=self.treatment_column,
+          treatment_assignment_index_name=self.treatment_column,
       )
 
       ab_simulation_results_list.append(
           experiment_analysis.analyze_experiment(
-              simulated_ab_test_data, self.design
+              simulated_ab_test_data,
+              design=self.design,
+              metric_name=self.design.primary_metric,
+              treatment_assignment_index_name=self.treatment_column,
           )
       )
 

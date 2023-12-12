@@ -335,20 +335,28 @@ class SyntheticTreatmentEffectTest(parameterized.TestCase):
         "item_id": [1, 2, 3, 4],
         "treatment": [0, 1, 0, 1],
         "test": [0.0, 0.1, 0.5, 0.2],
-    })
+    }).set_index(["item_id", "treatment"])
+    pivoted_data.columns = pd.MultiIndex.from_product(
+        [["clicks"], pivoted_data.columns]
+    )
+
     design = ExperimentDesign(is_crossover=False, **self.irrelevent_design_args)
 
     actual_data = experiment_simulations.apply_synthetic_treatment_effect(
         pivoted_data,
         design=design,
+        metric_name="clicks",
         effect_size=0.5,
-        treatment_column="treatment",
+        treatment_assignment_index_name="treatment",
     )
     expected_data = pd.DataFrame({
         "item_id": [1, 2, 3, 4],
         "treatment": [0, 1, 0, 1],
         "test": [0.0, 0.6, 0.5, 0.7],
-    })
+    }).set_index(["item_id", "treatment"])
+    expected_data.columns = pd.MultiIndex.from_product(
+        [["clicks"], expected_data.columns]
+    )
 
     pd.testing.assert_frame_equal(actual_data, expected_data)
 
@@ -358,69 +366,120 @@ class SyntheticTreatmentEffectTest(parameterized.TestCase):
         "treatment": [0, 1, 0, 1],
         "test_1": [0.0, 0.1, 0.5, 0.2],
         "test_2": [0.3, 0.2, 0.9, 0.8],
-    })
+    }).set_index(["item_id", "treatment"])
+    pivoted_data.columns = pd.MultiIndex.from_product(
+        [["clicks"], pivoted_data.columns]
+    )
+
     design = ExperimentDesign(is_crossover=True, **self.irrelevent_design_args)
 
     actual_data = experiment_simulations.apply_synthetic_treatment_effect(
         pivoted_data,
         design=design,
+        metric_name="clicks",
         effect_size=0.5,
-        treatment_column="treatment",
+        treatment_assignment_index_name="treatment",
     )
     expected_data = pd.DataFrame({
         "item_id": [1, 2, 3, 4],
         "treatment": [0, 1, 0, 1],
         "test_1": [0.0, 0.6, 0.5, 0.7],
         "test_2": [0.8, 0.2, 1.4, 0.8],
-    })
+    }).set_index(["item_id", "treatment"])
+    expected_data.columns = pd.MultiIndex.from_product(
+        [["clicks"], expected_data.columns]
+    )
 
     pd.testing.assert_frame_equal(actual_data, expected_data)
 
-  @parameterized.parameters(["treatment", "test"])
   def test_apply_synthetic_treatment_effect_raises_if_required_column_missing_for_regular_experiment(
-      self, required_column
+      self,
   ):
     pivoted_data = pd.DataFrame({
         "item_id": [1, 2, 3, 4],
         "treatment": [0, 1, 0, 1],
-        "test": [0.0, 0.1, 0.5, 0.2],
-    }).drop(required_column, axis=1)
+        "test_wrong_name": [0.0, 0.1, 0.5, 0.2],
+    }).set_index(["item_id", "treatment"])
+    pivoted_data.columns = pd.MultiIndex.from_product(
+        [["clicks"], pivoted_data.columns]
+    )
+
     design = ExperimentDesign(is_crossover=False, **self.irrelevent_design_args)
 
-    with self.assertRaisesRegex(
+    with self.assertRaisesWithLiteralMatch(
         ValueError,
         "The pivoted_data is missing the following required columns:"
-        f" {{'{required_column}'}}",
+        " {('clicks', 'test')}",
     ):
       experiment_simulations.apply_synthetic_treatment_effect(
           pivoted_data,
           design=design,
+          metric_name="clicks",
           effect_size=0.5,
-          treatment_column="treatment",
+          treatment_assignment_index_name="treatment",
       )
 
-  @parameterized.parameters(["treatment", "test_1", "test_2"])
+  @parameterized.parameters(["test_1", "test_2"])
   def test_apply_synthetic_treatment_effect_raises_if_required_column_missing_for_crossover_experiment(
       self, required_column
   ):
-    pivoted_data = pd.DataFrame({
-        "item_id": [1, 2, 3, 4],
-        "treatment": [0, 1, 0, 1],
-        "test_1": [0.0, 0.1, 0.5, 0.2],
-        "test_2": [0.3, 0.2, 0.9, 0.8],
-    }).drop(required_column, axis=1)
+    pivoted_data = (
+        pd.DataFrame({
+            "item_id": [1, 2, 3, 4],
+            "treatment": [0, 1, 0, 1],
+            "test_1": [0.0, 0.1, 0.5, 0.2],
+            "test_2": [0.3, 0.2, 0.9, 0.8],
+        })
+        .drop(required_column, axis=1)
+        .set_index(["item_id", "treatment"])
+    )
+    pivoted_data.columns = pd.MultiIndex.from_product(
+        [["clicks"], pivoted_data.columns]
+    )
+
     design = ExperimentDesign(is_crossover=True, **self.irrelevent_design_args)
 
-    with self.assertRaisesRegex(
+    with self.assertRaisesWithLiteralMatch(
         ValueError,
         "The pivoted_data is missing the following required columns:"
-        f" {{'{required_column}'}}",
+        f" {{('clicks', '{required_column}')}}",
     ):
       experiment_simulations.apply_synthetic_treatment_effect(
           pivoted_data,
           design=design,
+          metric_name="clicks",
           effect_size=0.5,
-          treatment_column="treatment",
+          treatment_assignment_index_name="treatment",
+      )
+
+  @parameterized.parameters([True, False])
+  def test_apply_synthetic_treatment_effect_raises_if_treatment_assignment_missing(
+      self, is_crossover
+  ):
+    pivoted_data = pd.DataFrame({
+        "item_id": [1, 2, 3, 4],
+        "test_1": [0.0, 0.1, 0.5, 0.2],
+        "test_2": [0.3, 0.2, 0.9, 0.8],
+    }).set_index(["item_id"])
+    pivoted_data.columns = pd.MultiIndex.from_product(
+        [["clicks"], pivoted_data.columns]
+    )
+
+    design = ExperimentDesign(
+        is_crossover=is_crossover, **self.irrelevent_design_args
+    )
+
+    with self.assertRaisesWithLiteralMatch(
+        ValueError,
+        "The pivoted_data does not contain the"
+        " treatment_assignment_index_name.",
+    ):
+      experiment_simulations.apply_synthetic_treatment_effect(
+          pivoted_data,
+          design=design,
+          metric_name="clicks",
+          effect_size=0.5,
+          treatment_assignment_index_name="treatment",
       )
 
 

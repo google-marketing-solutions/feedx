@@ -23,6 +23,7 @@ import pandas as pd
 
 from feedx import experiment_analysis
 from feedx import experiment_design
+from feedx import statistics
 
 StatisticalTestResults = experiment_analysis.statistics.StatisticalTestResults
 
@@ -66,10 +67,12 @@ class ExperimentAnalysisTest(parameterized.TestCase):
 
   def test_analyze_regular_experiment_returns_analysis_results(self):
     data = pd.DataFrame({
-        "treatment": [0] * 5 + [1] * 5,
+        "treatment_assignment": [0] * 5 + [1] * 5,
         "test": np.linspace(0, 1, 10),
         "pretest": np.ones(10),
-    })
+    }).set_index(["treatment_assignment"])
+    data.columns = pd.MultiIndex.from_product([["clicks"], data.columns])
+
     design = experiment_design.ExperimentDesign(
         is_crossover=False,
         post_trim_percentile=0.1,
@@ -77,16 +80,22 @@ class ExperimentAnalysisTest(parameterized.TestCase):
         **self.irrelevant_design_args
     )
 
-    analysis_result = experiment_analysis.analyze_experiment(data, design)
+    analysis_result = experiment_analysis.analyze_experiment(
+        data,
+        design=design,
+        metric_name="clicks",
+    )
 
     self.assertIsInstance(analysis_result, StatisticalTestResults)
 
   def test_analyze_regular_experiment_uses_cuped_when_pretest_is_provided(self):
     data = pd.DataFrame({
-        "treatment": [0] * 5 + [1] * 5,
+        "treatment_assignment": [0] * 5 + [1] * 5,
         "test": np.linspace(0, 1, 10),
         "pretest": [0, 1] * 5,
-    })
+    }).set_index(["treatment_assignment"])
+    data.columns = pd.MultiIndex.from_product([["clicks"], data.columns])
+
     design = experiment_design.ExperimentDesign(
         is_crossover=False,
         post_trim_percentile=0.1,
@@ -98,20 +107,22 @@ class ExperimentAnalysisTest(parameterized.TestCase):
         "google3.third_party.professional_services.solutions.feedx.feedx.statistics.apply_cuped_adjustment",
         side_effect=lambda x, *y: x,
     ) as mock_apply_cuped_adjustment:
-      experiment_analysis.analyze_experiment(data, design)
-      mock_apply_cuped_adjustment.assert_called_once_with(
-          data["test"].values,
-          data["pretest"].values,
-          design.post_trim_percentile,
+      experiment_analysis.analyze_experiment(
+          data,
+          design=design,
+          metric_name="clicks",
       )
+      mock_apply_cuped_adjustment.assert_called_once()
 
   def test_analyze_regular_experiment_does_not_use_cuped_when_pretest_is_not_provided(
       self,
   ):
     data = pd.DataFrame({
-        "treatment": [0] * 5 + [1] * 5,
+        "treatment_assignment": [0] * 5 + [1] * 5,
         "test": np.linspace(0, 1, 10),
-    })
+    }).set_index(["treatment_assignment"])
+    data.columns = pd.MultiIndex.from_product([["clicks"], data.columns])
+
     design = experiment_design.ExperimentDesign(
         is_crossover=False,
         post_trim_percentile=0.1,
@@ -122,15 +133,21 @@ class ExperimentAnalysisTest(parameterized.TestCase):
     with mock.patch(
         "google3.third_party.professional_services.solutions.feedx.feedx.statistics.apply_cuped_adjustment"
     ) as mock_apply_cuped_adjustment:
-      experiment_analysis.analyze_experiment(data, design)
+      experiment_analysis.analyze_experiment(
+          data,
+          design=design,
+          metric_name="clicks",
+      )
       mock_apply_cuped_adjustment.assert_not_called()
 
   def test_analyze_crossover_experiment_returns_analysis_results(self):
     data = pd.DataFrame({
-        "treatment": [0] * 5 + [1] * 5,
+        "treatment_assignment": [0] * 5 + [1] * 5,
         "test_1": np.linspace(0, 1, 10),
         "test_2": np.linspace(0.5, 1.5, 10),
-    })
+    }).set_index(["treatment_assignment"])
+    data.columns = pd.MultiIndex.from_product([["clicks"], data.columns])
+
     design = experiment_design.ExperimentDesign(
         is_crossover=True,
         post_trim_percentile=0.1,
@@ -138,7 +155,11 @@ class ExperimentAnalysisTest(parameterized.TestCase):
         **self.irrelevant_design_args
     )
 
-    analysis_result = experiment_analysis.analyze_experiment(data, design)
+    analysis_result = experiment_analysis.analyze_experiment(
+        data,
+        design=design,
+        metric_name="clicks",
+    )
 
     self.assertIsInstance(analysis_result, StatisticalTestResults)
 
@@ -146,10 +167,12 @@ class ExperimentAnalysisTest(parameterized.TestCase):
       self,
   ):
     data = pd.DataFrame({
-        "treatment": [0] * 5 + [1] * 5,
+        "treatment_assignment": [0] * 5 + [1] * 5,
         "test_1": np.linspace(0, 1, 10),
         "test_2": np.linspace(0.5, 1.5, 10),
-    })
+    }).set_index(["treatment_assignment"])
+    data.columns = pd.MultiIndex.from_product([["clicks"], data.columns])
+
     design = experiment_design.ExperimentDesign(
         is_crossover=True,
         post_trim_percentile=0.0,
@@ -157,12 +180,21 @@ class ExperimentAnalysisTest(parameterized.TestCase):
         **self.irrelevant_design_args
     )
 
-    analysis_result = experiment_analysis.analyze_experiment(data, design)
+    analysis_result = experiment_analysis.analyze_experiment(
+        data,
+        design=design,
+        metric_name="clicks",
+    )
 
+    data_subset = data["clicks"].reset_index()
     expected_control_average = (
-        data.loc[data["treatment"] == 0, "test_1"].sum()
-        + data.loc[data["treatment"] == 1, "test_2"].sum()
-    ) / len(data.index.values)
+        data_subset.loc[
+            data_subset["treatment_assignment"] == 0, "test_1"
+        ].sum()
+        + data_subset.loc[
+            data_subset["treatment_assignment"] == 1, "test_2"
+        ].sum()
+    ) / len(data_subset.index.values)
 
     self.assertEqual(analysis_result.control_average, expected_control_average)
 
@@ -170,9 +202,11 @@ class ExperimentAnalysisTest(parameterized.TestCase):
       self,
   ):
     data = pd.DataFrame({
-        "treatment": [0] * 5 + [1] * 5,
+        "treatment_assignment": [0] * 5 + [1] * 5,
         "test": np.linspace(0, 1, 10),
-    })
+    }).set_index(["treatment_assignment"])
+    data.columns = pd.MultiIndex.from_product([["clicks"], data.columns])
+
     design = experiment_design.ExperimentDesign(
         is_crossover=False,
         post_trim_percentile=0.0,
@@ -180,22 +214,57 @@ class ExperimentAnalysisTest(parameterized.TestCase):
         **self.irrelevant_design_args
     )
 
-    analysis_result = experiment_analysis.analyze_experiment(data, design)
+    analysis_result = experiment_analysis.analyze_experiment(
+        data,
+        design=design,
+        metric_name="clicks",
+    )
 
-    expected_control_average = data.loc[data["treatment"] == 0, "test"].mean()
+    data_subset = data["clicks"].reset_index()
+    expected_control_average = data_subset.loc[
+        data_subset["treatment_assignment"] == 0, "test"
+    ].mean()
 
     self.assertEqual(analysis_result.control_average, expected_control_average)
 
-  @parameterized.parameters("treatment", "test_1", "test_2")
-  def test_raises_exception_if_required_columns_for_crossover_are_missing(
-      self, required_missing_column
+  @parameterized.parameters(True, False)
+  def test_raises_exception_if_treatment_assignment_column_is_missing(
+      self, is_crossover
   ):
     data = pd.DataFrame({
         "treatment": [0] * 5 + [1] * 5,
         "test_1": np.linspace(0, 1, 10),
         "test_2": np.linspace(0.5, 1.5, 10),
-    })
+    }).set_index(["treatment"])
+
+    data.columns = pd.MultiIndex.from_product([["clicks"], data.columns])
+
+    design = experiment_design.ExperimentDesign(
+        is_crossover=is_crossover,
+        post_trim_percentile=0.1,
+        pretest_weeks=4,
+        **self.irrelevant_design_args
+    )
+
+    with self.assertRaises(ValueError):
+      experiment_analysis.analyze_experiment(
+          data,
+          design=design,
+          metric_name="clicks",
+      )
+
+  @parameterized.parameters("test_1", "test_2")
+  def test_raises_exception_if_required_columns_for_crossover_are_missing(
+      self, required_missing_column
+  ):
+    data = pd.DataFrame({
+        "treatment_assignment": [0] * 5 + [1] * 5,
+        "test_1": np.linspace(0, 1, 10),
+        "test_2": np.linspace(0.5, 1.5, 10),
+    }).set_index(["treatment_assignment"])
+
     data.drop(columns=required_missing_column, inplace=True)
+    data.columns = pd.MultiIndex.from_product([["clicks"], data.columns])
 
     design = experiment_design.ExperimentDesign(
         is_crossover=True,
@@ -205,18 +274,24 @@ class ExperimentAnalysisTest(parameterized.TestCase):
     )
 
     with self.assertRaises(ValueError):
-      experiment_analysis.analyze_experiment(data, design)
+      experiment_analysis.analyze_experiment(
+          data,
+          design=design,
+          metric_name="clicks",
+      )
 
-  @parameterized.parameters("treatment", "test", "pretest")
+  @parameterized.parameters("test", "pretest")
   def test_raises_exception_if_required_columns_for_regular_experiment_are_missing(
       self, required_missing_column
   ):
     data = pd.DataFrame({
-        "treatment": [0] * 5 + [1] * 5,
+        "treatment_assignment": [0] * 5 + [1] * 5,
         "test": np.linspace(0, 1, 10),
         "pretest": np.linspace(0, 1, 10),
-    })
+    }).set_index(["treatment_assignment"])
+
     data.drop(columns=required_missing_column, inplace=True)
+    data.columns = pd.MultiIndex.from_product([["clicks"], data.columns])
 
     design = experiment_design.ExperimentDesign(
         is_crossover=False,
@@ -226,13 +301,18 @@ class ExperimentAnalysisTest(parameterized.TestCase):
     )
 
     with self.assertRaises(ValueError):
-      experiment_analysis.analyze_experiment(data, design)
+      experiment_analysis.analyze_experiment(
+          data,
+          design=design,
+          metric_name="clicks",
+      )
 
   def test_pretest_column_not_required_if_pretest_weeks_is_0(self):
     data = pd.DataFrame({
-        "treatment": [0] * 5 + [1] * 5,
+        "treatment_assignment": [0] * 5 + [1] * 5,
         "test": np.linspace(0, 1, 10),
-    })
+    }).set_index(["treatment_assignment"])
+    data.columns = pd.MultiIndex.from_product([["clicks"], data.columns])
 
     design = experiment_design.ExperimentDesign(
         is_crossover=False,
@@ -241,7 +321,11 @@ class ExperimentAnalysisTest(parameterized.TestCase):
         **self.irrelevant_design_args
     )
 
-    analysis_results = experiment_analysis.analyze_experiment(data, design)
+    analysis_results = experiment_analysis.analyze_experiment(
+        data,
+        design=design,
+        metric_name="clicks",
+    )
 
     self.assertIsInstance(analysis_results, StatisticalTestResults)
 
@@ -250,12 +334,14 @@ class ExperimentAnalysisTest(parameterized.TestCase):
       self, is_crossover
   ):
     data = pd.DataFrame({
-        "treatment": [0] * 5 + [1] * 5,
+        "treatment_assignment": [0] * 5 + [1] * 5,
         "pretest": np.linspace(0, 1, 10),
         "test": np.linspace(0, 1, 10),
         "test_1": np.linspace(0, 1, 10),
         "test_2": np.linspace(0.5, 1.5, 10),
-    })
+    }).set_index(["treatment_assignment"])
+    data.columns = pd.MultiIndex.from_product([["clicks"], data.columns])
+
     original_data_copy = data.copy()
 
     design = experiment_design.ExperimentDesign(
@@ -265,9 +351,47 @@ class ExperimentAnalysisTest(parameterized.TestCase):
         **self.irrelevant_design_args
     )
 
-    experiment_analysis.analyze_experiment(data, design)
+    experiment_analysis.analyze_experiment(
+        data,
+        design=design,
+        metric_name="clicks",
+    )
 
     pd.testing.assert_frame_equal(data, original_data_copy)
+
+  @parameterized.parameters(False, True)
+  def test_analyze_experiment_does_not_use_trimming_if_apply_trimming_if_in_design_is_false(
+      self, is_crossover
+  ):
+    data = pd.DataFrame({
+        "treatment_assignment": [0] * 5 + [1] * 5,
+        "pretest": np.linspace(0, 1, 10),
+        "test": np.linspace(0, 1, 10),
+        "test_1": np.linspace(0, 1, 10),
+        "test_2": np.linspace(0.5, 1.5, 10),
+    }).set_index(["treatment_assignment"])
+    data.columns = pd.MultiIndex.from_product([["clicks"], data.columns])
+
+    design = experiment_design.ExperimentDesign(
+        is_crossover=is_crossover,
+        post_trim_percentile=0.1,
+        pretest_weeks=4,
+        **self.irrelevant_design_args
+    )
+    with mock.patch(
+        "google3.third_party.professional_services.solutions.feedx.feedx.statistics.TrimmedArray",
+        side_effect=statistics.TrimmedArray,
+    ) as mock_trimmed_array:
+      experiment_analysis.analyze_experiment(
+          data,
+          design=design,
+          metric_name="clicks",
+          apply_trimming_if_in_design=False,
+      )
+      trimming_quantiles_used = set(
+          [call[0][1] for call in mock_trimmed_array.call_args_list]
+      )
+      self.assertSetEqual(trimming_quantiles_used, {0.0})
 
 
 class AddTimePeriodColumnTests(parameterized.TestCase):

@@ -452,7 +452,10 @@ def pivot_time_assignment(
 
 
 def _analyze_regular_experiment(
-    data: pd.DataFrame, post_trim_percentile: float
+    data: pd.DataFrame,
+    *,
+    post_trim_percentile: float,
+    treatment_assignment_column: str,
 ) -> statistics.StatisticalTestResults:
   """Analyzes a regular (non-crossover) A/B test.
 
@@ -469,6 +472,8 @@ def _analyze_regular_experiment(
       metric for that sample from the period before the experiment began.
     post_trim_percentile: The fraction of smallest and largest samples to trim
       from the metric in the analysis.
+    treatment_assignment_column: The column containin the treatment assignment
+      in the data.
 
   Returns:
     The statistical test results.
@@ -480,8 +485,8 @@ def _analyze_regular_experiment(
   else:
     y = data["test"].values
 
-  y_0 = y[data["treatment"].values == 0]
-  y_1 = y[data["treatment"].values == 1]
+  y_0 = y[data[treatment_assignment_column].values == 0]
+  y_1 = y[data[treatment_assignment_column].values == 1]
 
   return statistics.yuens_t_test_ind(
       y_1,
@@ -493,7 +498,10 @@ def _analyze_regular_experiment(
 
 
 def _analyze_crossover_experiment(
-    data: pd.DataFrame, post_trim_percentile: float
+    data: pd.DataFrame,
+    *,
+    post_trim_percentile: float,
+    treatment_assignment_column: str,
 ) -> statistics.StatisticalTestResults:
   """Analyzes a crossover A/B test.
 
@@ -510,13 +518,15 @@ def _analyze_crossover_experiment(
       period (0).
     post_trim_percentile: The fraction of smallest and largest samples to trim
       from the metric in the analysis.
+    treatment_assignment_column: The column containin the treatment assignment
+      in the data.
 
   Returns:
     The statistical test results.
   """
   y_1 = data["test_1"].values
   y_2 = data["test_2"].values
-  is_treated_first = data["treatment"].values == 1
+  is_treated_first = data[treatment_assignment_column].values == 1
 
   # I need to align the means of the first and second period to reduce variance,
   # but for the relative uplift to make sense I will align them to the
@@ -555,7 +565,12 @@ def _analyze_crossover_experiment(
 
 
 def analyze_experiment(
-    data: pd.DataFrame, design: ExperimentDesign
+    data: pd.DataFrame,
+    *,
+    design: ExperimentDesign,
+    metric_name: str,
+    treatment_assignment_index_name: str = "treatment_assignment",
+    apply_trimming_if_in_design: bool = True,
 ) -> statistics.StatisticalTestResults:
   """Analyzes an A/B test.
 
@@ -580,9 +595,18 @@ def analyze_experiment(
   began.
 
   Args:
-    data: The dataset to be analyzed.
+    data: The dataset to be analyzed. This should have been generated with
+      pivot_time_assignment(), so it will have a two level index containing the
+      item_id and the treatment assignment, and a two level column where the top
+      level is the name of the metric, and the second level is the time period.
     design: The design of the experiment being analyzed, containing the post
       trim percentile and whether the it is a crossover test or not.
+    metric_name: The name of the metric to be analyzed. This should exist as the
+      top level
+    treatment_assignment_index_name: The name of the index level containing the
+      treatment assignment in the data. Defaults to "treatment_assignment".
+    apply_trimming_if_in_design: Whether to apply the trimming if it is
+      specified in the design. Defaults to True.
 
   Returns:
     The statistical test results.
@@ -591,7 +615,9 @@ def analyze_experiment(
     ValueError: If the dataframe does not have the required columns (depending
       on the design).
   """
-  required_columns = {"treatment"}
+  data_metric_subset = data[metric_name].reset_index()
+
+  required_columns = {treatment_assignment_index_name}
   if design.is_crossover:
     required_columns.update({"test_1", "test_2"})
   else:
@@ -599,14 +625,27 @@ def analyze_experiment(
     if design.pretest_weeks > 0:
       required_columns.add("pretest")
 
-  missing_columns = required_columns - set(data.columns)
+  missing_columns = required_columns - set(data_metric_subset.columns)
   if missing_columns:
     raise ValueError(
         "The dataframe is missing the following required columns: "
         f"{missing_columns}"
     )
 
-  if design.is_crossover:
-    return _analyze_crossover_experiment(data, design.post_trim_percentile)
+  if apply_trimming_if_in_design:
+    post_trim_percentile = design.post_trim_percentile
   else:
-    return _analyze_regular_experiment(data, design.post_trim_percentile)
+    post_trim_percentile = 0.0
+
+  if design.is_crossover:
+    return _analyze_crossover_experiment(
+        data_metric_subset,
+        post_trim_percentile=post_trim_percentile,
+        treatment_assignment_column=treatment_assignment_index_name,
+    )
+  else:
+    return _analyze_regular_experiment(
+        data_metric_subset,
+        post_trim_percentile=post_trim_percentile,
+        treatment_assignment_column=treatment_assignment_index_name,
+    )

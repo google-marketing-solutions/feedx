@@ -354,7 +354,7 @@ class Coinflip:
 
 def trim_outliers(
     data: pd.DataFrame,
-    order_by: str,
+    order_by: str | tuple[str, ...],
     trim_percentile_top: float,
     trim_percentile_bottom: float,
     rng: np.random.Generator,
