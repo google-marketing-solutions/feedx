@@ -1140,6 +1140,86 @@ class ValidateExperimentDataTests(parameterized.TestCase):
           treatment_assignment_column="treatment_assignment",
       )
 
+  @mock_experiment_design_validation
+  def test_sample_ratio_mismatch_is_checked(self, mock_experiment_design):
+    experiment_data = pd.DataFrame({
+        "date": pd.to_datetime(
+            ["2023-10-01", "2023-10-01", "2023-10-08", "2023-10-08"]
+        ),
+        "date_id": [1, 1, 2, 2],
+        "item_id": ["1", "2", "1", "2"],
+        "clicks": [1, 2, 3, 4],
+        "impressions": [10, 12, 13, 14],
+        "treatment_assignment": [0, 1, 0, 1],
+    })
+    design = experiment_design.ExperimentDesign(
+        n_items_before_trimming=2,
+        runtime_weeks=2,
+        pretest_weeks=0,
+        **self.irrelevant_design_args
+    )
+    with mock.patch(
+        "google3.third_party.professional_services.solutions.feedx.feedx.data_preparation.validate_no_sample_ratio_mismatch",
+        side_effect=data_preparation.validate_no_sample_ratio_mismatch,
+    ) as mock_validate_no_sample_ratio_mismatch:
+      data_preparation.validate_experiment_data(
+          experiment_data,
+          design=design,
+          item_id_column="item_id",
+          date_column="date",
+          date_id_column="date_id",
+          metric_columns=["clicks", "impressions"],
+          experiment_start_date="2023-10-01",
+          treatment_assignment_column="treatment_assignment",
+      )
+      mock_validate_no_sample_ratio_mismatch.assert_called_with(
+          experiment_data, "item_id", "treatment_assignment"
+      )
+
+
+class SampleRatioMismatchValidationTests(parameterized.TestCase):
+
+  @parameterized.parameters([
+      (500, 500),
+      (490, 510),
+      (510, 490),
+      (50, 50),
+      (49, 51),
+      (51, 49),
+      (40, 60),
+      (60, 40),
+  ])
+  def test_sample_ratio_mismatch_passes_when_close_to_50_50(
+      self, n_control, n_treated
+  ):
+    test_data = pd.DataFrame({
+        "item_id": np.arange(n_control + n_treated),
+        "treatment_assignment": [0] * n_control + [1] * n_treated,
+    })
+
+    data_preparation.validate_no_sample_ratio_mismatch(
+        test_data, "item_id", "treatment_assignment"
+    )
+
+  @parameterized.parameters([
+      (400, 600),
+      (600, 400),
+      (30, 70),
+      (70, 30),
+  ])
+  def test_sample_ratio_mismatch_fails_when_far_from_50_50(
+      self, n_control, n_treated
+  ):
+    test_data = pd.DataFrame({
+        "item_id": np.arange(n_control + n_treated),
+        "treatment_assignment": [0] * n_control + [1] * n_treated,
+    })
+
+    with self.assertRaises(ValueError):
+      data_preparation.validate_no_sample_ratio_mismatch(
+          test_data, "item_id", "treatment_assignment"
+      )
+
 
 class AddWeekIdAndWeekStartTests(parameterized.TestCase):
 

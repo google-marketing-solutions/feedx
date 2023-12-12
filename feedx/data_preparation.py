@@ -25,6 +25,7 @@ from typing import Callable
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
+from scipy import stats
 
 from feedx import experiment_design
 
@@ -841,6 +842,46 @@ def _validate_coinflip_matches_assignments(
   print("Coinflip salt from design matches assignments, check passed.")
 
 
+def validate_no_sample_ratio_mismatch(
+    experiment_data: pd.DataFrame,
+    item_id_column: str,
+    treatment_assignment_column: str,
+    p_value_threshold: float = 0.001,
+) -> None:
+  """Validates there is no sample ratio mismatch in the treatment assignment.
+
+  Sample ratio mismatch (SRM) occures when the number of samples in control and
+  treatment does not match the expected split (in this case 50/50). This
+  checks this by estimating a p-value and if the p-value is smaller than the
+  p_value_threshold it raises an error. The p value threshold should be very
+  small, otherwise this validation will fail very often just by chance, and
+  if there is a real SRM problem it should be quite obvious.
+
+  Args:
+    experiment_data: The data to run the validation on.
+    item_id_column: The column containing the item id.
+    treatment_assignment_column: The column containing the treatment assignment,
+      0 for control and 1 for treatment.
+     p_value_threshold: The threshold to compare the p-value against. Defaults
+       to 0.001.
+
+  Raises:
+    If the p-value for the null hypothesis that the probability of being
+    assigned to control is 50% is smaller than the p-value threshold.
+  """
+  counts = experiment_data.groupby(treatment_assignment_column)[
+      item_id_column
+  ].nunique()
+  srm_result = stats.binomtest(
+      counts[1], n=counts[1] + counts[0], p=0.5, alternative="two-sided"
+  )
+
+  if srm_result.pvalue < p_value_threshold:
+    raise ValueError(f"Sample ratio mismatch detected! {srm_result}")
+
+  print("No Sample Ratio Mismatch, check passed.")
+
+
 def validate_historical_data(
     historical_data: pd.DataFrame,
     item_id_column: str,
@@ -1012,6 +1053,9 @@ def validate_experiment_data(
   )
   _validate_coinflip_matches_assignments(
       experiment_data, design, treatment_assignment_column, item_id_column
+  )
+  validate_no_sample_ratio_mismatch(
+      experiment_data, item_id_column, treatment_assignment_column
   )
 
 
