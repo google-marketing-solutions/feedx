@@ -475,74 +475,118 @@ def downsample_items(
   return data
 
 
-def group_daily_to_complete_weekly_with_week_numbers(
+def add_week_id_and_week_start(
+    data: pd.DataFrame,
+    date_column: str,
+    experiment_start_date: str | None = None,
+    week_id_column: str = "week_id",
+    week_start_column: str = "week_start",
+) -> pd.DataFrame:
+  """Returns the dataframe with the week_id and week start columns added.
+
+  Args:
+    data: The data to add the week id column to.
+    date_column: The column name containing the dates in the data.
+    experiment_start_date: The experiment start date to align the weeks to. Week
+      ID 0 will start on the experiment start date. Must have the format
+      YYYY-MM-DD. If not set, it will default to the first date in the data.
+    week_id_column: The output column name that will contain the week ids.
+      Defaults to "week_id".
+    week_start_column: The name to give the output column that contains the date
+      the week starts on. Defaults to "week_start".
+  """
+  if experiment_start_date is None:
+    experiment_start_date_dt = data[date_column].min()
+  else:
+    experiment_start_date_dt = dt.datetime.strptime(
+        experiment_start_date, "%Y-%m-%d"
+    )
+
+  days_offset = (data[date_column] - experiment_start_date_dt).dt.days
+  data[week_id_column] = days_offset // 7
+  data[week_start_column] = data[week_id_column].apply(
+      lambda week_number: experiment_start_date_dt
+      + dt.timedelta(days=week_number * 7)
+  )
+  return data
+
+
+def group_data_to_complete_weeks(
     data: pd.DataFrame,
     date_column: dt.datetime,
     item_id_column: str,
-    week_number_column: str = "week_number",
-    week_start_column: str = "week_start",
+    week_id_column: str,
+    week_start_column: str,
+    extra_group_columns: list[str] | None = None,
 ) -> pd.DataFrame:
-  """Group input data to weekly data & assign a week number and week start date.
+  """Group input data to weekly data and drop any incomplete weeks.
 
   Daily and weekly data can be ingested. If the data provided is daily, this
-  function will group by week, and if there are any incomplete weeks (weeks 
+  function will group by week, and if there are any incomplete weeks (weeks
   without 7 days), they will be removed. If weekly data is provided, no grouping
-  will be done. The function will assign a week number and a week start date
+  will be done.
 
   Args:
     data: The data to be grouped to weekly
     date_column: The name of the column containing the date in the input data
     item_id_column: The name of the column containing the item_id in the input
       data
-    week_number_column: The name to give the output column that contains
-      week_number
-    week_start_column: The name to give the output column that contains the date
-      the week starts on
+    week_id_column: The name of the column that contains the week_id.
+    week_start_column: The name of the column that contains the week_start.
+    extra_group_columns: Extra columns to include in the grouping. Must already
+      be at weekly level.
 
   Returns:
-    Data grouped by week
+    Data grouped by week.
 
   Raises:
-  ValueError: If the input data is not weekly or daily
+    ValueError: If the input data is not weekly or daily.
   """
-  date_data = data.copy()
-  date_sorted_unique = date_data[date_column].drop_duplicates().sort_values()
-  frequency = ((
-      date_sorted_unique - date_sorted_unique.shift(1)).iloc[1:].dt.days.values)
+  extra_group_columns = extra_group_columns or []
+  data_copy = data.copy()
+  date_sorted_unique = data_copy[date_column].drop_duplicates().sort_values()
+  frequency = (
+      (date_sorted_unique - date_sorted_unique.shift(1)).iloc[1:].dt.days.values
+  )
 
   if np.all(frequency == 1):
     print("The input data is daily, grouping to weekly.")
-    min_date = date_data[date_column].min()
-    days_offset = (date_data[date_column] - min_date).dt.days
-    date_data[week_number_column] = days_offset // 7
+    non_aggregate_columns = [
+        week_id_column,
+        week_start_column,
+        item_id_column,
+        date_column,
+    ] + extra_group_columns
     aggregations = {
         c: (c, "sum")
-        for c in date_data.columns.values
-        if c not in [week_number_column, item_id_column, date_column]
+        for c in data_copy.columns.values
+        if c not in non_aggregate_columns
     }
     aggregations["days_in_week"] = (date_column, "nunique")
-    date_data = (
-        date_data.groupby([week_number_column, item_id_column])
+
+    data_copy = (
+        data_copy.groupby(
+            [week_id_column, week_start_column, item_id_column]
+            + extra_group_columns
+        )
         .agg(**aggregations)
         .reset_index()
     )
-    date_data = date_data[date_data["days_in_week"] == 7].copy()
-    date_data = date_data.drop(columns=["days_in_week"])
-    date_data[week_start_column] = date_data[week_number_column].apply(
-        lambda x: min_date + dt.timedelta(days=x * 7)
+
+    data_copy = (
+        data_copy[data_copy["days_in_week"] == 7]
+        .copy()
+        .drop(columns=["days_in_week"])
     )
   elif np.all(frequency == 7):
     print("The input data is already weekly, grouping not required.")
-    date_data[week_number_column] = (
-        date_data[date_column].astype("category").cat.codes.astype(np.int64)
-    )
-    date_data = date_data.rename({date_column: week_start_column}, axis=1)
+    data_copy = data_copy.drop(columns=[date_column])
   else:
     raise ValueError(
         "The data is not daily or weekly. Cannot proceed with mixed frequency"
     )
 
-  return date_data
+  return data_copy
 
 
 def _validate_every_value_exists_exactly_once_for_every_group(

@@ -506,7 +506,81 @@ class DataValidationTests(parameterized.TestCase):
       )
 
 
-class GroupDataToWeekly(parameterized.TestCase):
+class AddWeekIdAndWeekStartTests(parameterized.TestCase):
+
+  def setUp(self):
+    super().setUp()
+    self.data = pd.DataFrame({
+        "date": pd.to_datetime([
+            "2023-10-01",
+            "2023-10-02",
+            "2023-10-07",
+            "2023-10-08",
+            "2023-10-09",
+            "2023-10-17",
+        ]),
+    })
+
+  def test_adds_week_id_relative_to_first_date_by_default(self):
+    actual_result = data_preparation.add_week_id_and_week_start(
+        self.data, date_column="date"
+    )
+
+    expected_result = pd.DataFrame({
+        "date": pd.to_datetime([
+            "2023-10-01",
+            "2023-10-02",
+            "2023-10-07",
+            "2023-10-08",
+            "2023-10-09",
+            "2023-10-17",
+        ]),
+        "week_id": [0, 0, 0, 1, 1, 2],
+        "week_start": pd.to_datetime([
+            "2023-10-01",
+            "2023-10-01",
+            "2023-10-01",
+            "2023-10-08",
+            "2023-10-08",
+            "2023-10-15",
+        ]),
+    })
+
+    pd.testing.assert_frame_equal(
+        actual_result, expected_result, check_like=True
+    )
+
+  def test_adds_week_id_relative_to_experiment_start_date_if_set(self):
+    actual_result = data_preparation.add_week_id_and_week_start(
+        self.data, date_column="date", experiment_start_date="2023-10-02"
+    )
+
+    expected_result = pd.DataFrame({
+        "date": pd.to_datetime([
+            "2023-10-01",
+            "2023-10-02",
+            "2023-10-07",
+            "2023-10-08",
+            "2023-10-09",
+            "2023-10-17",
+        ]),
+        "week_id": [-1, 0, 0, 0, 1, 2],
+        "week_start": pd.to_datetime([
+            "2023-09-25",
+            "2023-10-02",
+            "2023-10-02",
+            "2023-10-02",
+            "2023-10-09",
+            "2023-10-16",
+        ]),
+    })
+
+    pd.testing.assert_frame_equal(
+        actual_result, expected_result, check_like=True
+    )
+
+
+class GroupDataToCompleteWeeksTests(parameterized.TestCase):
   def test_group_daily_data_to_weekly(self):
     values = [
         ["ABC123", "2023-10-01", 1, 10000],
@@ -521,34 +595,31 @@ class GroupDataToWeekly(parameterized.TestCase):
     daily_data = pd.DataFrame(
         values, columns=["item_id", "date", "clicks", "impressions"]
     )
-
-    daily_data = data_preparation.standardize_column_names_and_types(
-        data=daily_data,
-        item_id_column="item_id",
-        date_column="date",
-        clicks_column="clicks",
-        impressions_column="impressions")
+    daily_data["date"] = pd.to_datetime(daily_data["date"])
+    daily_data = data_preparation.add_week_id_and_week_start(
+        daily_data, date_column="date"
+    )
 
     expected_daily_result = pd.DataFrame([{
-        "week_number": 0,
+        "week_id": 0,
+        "week_start": "2023-10-01",
         "item_id": "ABC123",
         "clicks": 769,
         "impressions": 3612551,
-        "week_start": "2023-10-01",
     }])
     expected_daily_result["week_start"] = pd.to_datetime(
         expected_daily_result["week_start"]
     )
-    actual_daily_result = (
-        data_preparation.group_daily_to_complete_weekly_with_week_numbers(
-            daily_data,
-            item_id_column="item_id",
-            date_column="date",
-            week_number_column="week_number",
-            week_start_column="week_start",
-        )
+    actual_daily_result = data_preparation.group_data_to_complete_weeks(
+        daily_data,
+        item_id_column="item_id",
+        date_column="date",
+        week_id_column="week_id",
+        week_start_column="week_start",
     )
-    pd.testing.assert_frame_equal(actual_daily_result, expected_daily_result)
+    pd.testing.assert_frame_equal(
+        actual_daily_result, expected_daily_result, check_like=True
+    )
 
   def test_group_weekly_data_to_weekly(self):
     values = [
@@ -560,56 +631,54 @@ class GroupDataToWeekly(parameterized.TestCase):
     weekly_data = pd.DataFrame(
         values, columns=["item_id", "date", "clicks", "impressions"]
     )
+    weekly_data["date"] = pd.to_datetime(weekly_data["date"])
+    weekly_data = data_preparation.add_week_id_and_week_start(
+        weekly_data, date_column="date"
+    )
 
-    weekly_data = data_preparation.standardize_column_names_and_types(
-        data=weekly_data,
-        item_id_column="item_id",
-        date_column="date",
-        clicks_column="clicks",
-        impressions_column="impressions")
     expected_weekly_result = pd.DataFrame([
         {
             "item_id": "ABC123",
             "week_start": "2023-10-01",
             "clicks": 1,
             "impressions": 10000,
-            "week_number": 0,
+            "week_id": 0,
         },
         {
             "item_id": "ABC123",
             "week_start": "2023-10-08",
             "clicks": 50,
             "impressions": 500,
-            "week_number": 1,
+            "week_id": 1,
         },
         {
             "item_id": "ABC123",
             "week_start": "2023-10-15",
             "clicks": 100,
             "impressions": 3245234,
-            "week_number": 2,
+            "week_id": 2,
         },
         {
             "item_id": "ABC123",
             "week_start": "2023-10-22",
             "clicks": 435,
             "impressions": 353245,
-            "week_number": 3,
+            "week_id": 3,
         },
     ])
     expected_weekly_result["week_start"] = pd.to_datetime(
         expected_weekly_result["week_start"])
 
-    actual_weekly_result = (
-        data_preparation.group_daily_to_complete_weekly_with_week_numbers(
-            weekly_data,
-            item_id_column="item_id",
-            date_column="date",
-            week_number_column="week_number",
-            week_start_column="week_start",
-        )
+    actual_weekly_result = data_preparation.group_data_to_complete_weeks(
+        weekly_data,
+        item_id_column="item_id",
+        date_column="date",
+        week_id_column="week_id",
+        week_start_column="week_start",
     )
-    pd.testing.assert_frame_equal(actual_weekly_result, expected_weekly_result)
+    pd.testing.assert_frame_equal(
+        actual_weekly_result, expected_weekly_result, check_like=True
+    )
 
   def test_group_mixed_data_to_weekly_raises_exception_if_mixed_frequency(self):
     values = [
@@ -627,24 +696,23 @@ class GroupDataToWeekly(parameterized.TestCase):
     mixed_data = pd.DataFrame(
         values, columns=["item_id", "date", "clicks", "impressions"]
     )
-
-    mixed_data = data_preparation.standardize_column_names_and_types(
-        data=mixed_data,
-        item_id_column="item_id",
-        date_column="date",
-        clicks_column="clicks",
-        impressions_column="impressions")
+    mixed_data["date"] = pd.to_datetime(mixed_data["date"])
+    mixed_data = data_preparation.add_week_id_and_week_start(
+        mixed_data, date_column="date"
+    )
 
     with self.assertRaisesRegex(
         ValueError,
         "The data is not daily or weekly. Cannot proceed with mixed frequency",
     ):
-      data_preparation.group_daily_to_complete_weekly_with_week_numbers(
+      data_preparation.group_data_to_complete_weeks(
           mixed_data,
           item_id_column="item_id",
           date_column="date",
-          week_number_column="week_number",
+          week_id_column="week_id",
           week_start_column="week_start",
       )
+
+
 if __name__ == "__main__":
   absltest.main()
