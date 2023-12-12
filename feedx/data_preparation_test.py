@@ -23,6 +23,7 @@ import pandas as pd
 from feedx import data_preparation
 from feedx import experiment_design
 
+
 class SyntheticDataTest(parameterized.TestCase):
 
   def test_generate_synthetic_data_generates_expected_number_of_rows(
@@ -101,6 +102,93 @@ class SyntheticDataTest(parameterized.TestCase):
           rng=np.random.default_rng(123),
           ctr_standard_deviation=ctr_standard_deviation,
       )
+
+  def test_add_relative_effects_works_for_crossover(self):
+    input_data = pd.DataFrame({
+        "time_period": [
+            "pretest",
+            "washout_1",
+            "test_1",
+            "washout_2",
+            "test_2",
+            None,
+        ] * 2,
+        "treatment_assignment": [0] * 6 + [1] * 6,
+        "impressions": [1] * 12,
+        "clicks": [1] * 12,
+        "total_cost": [1] * 12,
+        "conversions": [1] * 12,
+        "total_conversion_value": [1] * 12,
+    })
+
+    output_data = (
+        data_preparation.add_relative_effects_to_synthetic_data_for_demo(
+            input_data,
+            time_period_column="time_period",
+            treatment_assignment_column="treatment_assignment",
+        )
+    )
+
+    expected_output_data = pd.DataFrame({
+        "time_period": [
+            "pretest",
+            "washout_1",
+            "test_1",
+            "washout_2",
+            "test_2",
+            None,
+        ] * 2,
+        "treatment_assignment": [0] * 6 + [1] * 6,
+        "impressions": [1, 1, 1, 1.1, 1.1, 1, 1, 1.1, 1.1, 1, 1, 1],
+        "clicks": [1, 1, 1, 1.2, 1.2, 1, 1, 1.2, 1.2, 1, 1, 1],
+        "total_cost": [1, 1, 1, 1.2, 1.2, 1, 1, 1.2, 1.2, 1, 1, 1],
+        "conversions": [1, 1, 1, 1.2, 1.2, 1, 1, 1.2, 1.2, 1, 1, 1],
+        "total_conversion_value": [1, 1, 1, 1.2, 1.2, 1, 1, 1.2, 1.2, 1, 1, 1],
+    })
+    pd.testing.assert_frame_equal(
+        output_data, expected_output_data, check_like=True
+    )
+
+
+def test_add_relative_effects_works_for_regular_experiment(self):
+  input_data = pd.DataFrame({
+      "time_period": [
+          "pretest",
+          "test",
+          None,
+      ] * 2,
+      "treatment_assignment": [0] * 3 + [1] * 3,
+      "impressions": [1] * 6,
+      "clicks": [1] * 6,
+      "total_cost": [1] * 6,
+      "conversions": [1] * 6,
+      "total_conversion_value": [1] * 6,
+  })
+
+  output_data = (
+      data_preparation.add_relative_effects_to_synthetic_data_for_demo(
+          input_data,
+          time_period_column="time_period",
+          treatment_assignment_column="treatment_assignment",
+      )
+  )
+
+  expected_output_data = pd.DataFrame({
+      "time_period": [
+          "pretest",
+          "test",
+          None,
+      ] * 2,
+      "treatment_assignment": [0] * 3 + [1] * 3,
+      "impressions": [1, 1, 1, 1, 1.1, 1],
+      "clicks": [1, 1, 1, 1, 1.2, 1],
+      "total_cost": [1, 1, 1, 1, 1.2, 1],
+      "conversions": [1, 1, 1, 1, 1.2, 1],
+      "total_conversion_value": [1, 1, 1, 1, 1.2, 1],
+  })
+  pd.testing.assert_frame_equal(
+      output_data, expected_output_data, check_like=True
+  )
 
 
 class StandardizeColumnNamesAndTypesTests(parameterized.TestCase):
