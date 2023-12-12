@@ -13,6 +13,7 @@
 # limitations under the License.
 
 """Tests for data_preparation."""
+from unittest import mock
 
 from absl.testing import absltest
 from absl.testing import parameterized
@@ -736,6 +737,172 @@ class AtLeastOneMetricTest(parameterized.TestCase):
     pd.testing.assert_frame_equal(
         actual_result, expected_result, check_like=True
     )
+
+
+class PrepareAndValidateHistoricalDataTests(parameterized.TestCase):
+
+  def setUp(self):
+    super().setUp()
+    self.raw_data = pd.DataFrame({
+        "Item ID": [1, 1, 2],
+        "YYYY-MM-DD": ["2023-10-01", "2023-10-08", "2023-10-01"],
+        "Clicks": ["1", "2", "3"],
+        "Impr.": [20.0, 21.0, 22.0],
+        "Conv.": ["2", "3", "5"],
+        "Conv. Value": ["2.3", "4.2", "5.0"],
+        "Cost": [1, 2, 3],
+        "other_metric": [5, 2, 1],
+        "Some extra column": ["something", "something", "something"],
+    })
+
+  def test_data_with_standard_primary_metric_is_prepared_correctly(self):
+    processed_data = data_preparation.prepare_and_validate_historical_data(
+        self.raw_data,
+        item_id_column="Item ID",
+        date_column="YYYY-MM-DD",
+        primary_metric="clicks",
+        primary_metric_column="Clicks",
+        rng=np.random.default_rng(seed=42),
+    )
+
+    expected_processed_data = pd.DataFrame({
+        "item_id": ["1", "1", "2", "2"],
+        "week_start": pd.to_datetime(
+            ["2023-10-01", "2023-10-08", "2023-10-01", "2023-10-08"]
+        ),
+        "week_id": [0, 1, 0, 1],
+        "clicks": [1, 2, 3, 0],
+    })
+    pd.testing.assert_frame_equal(
+        processed_data, expected_processed_data, check_like=True
+    )
+
+  def test_data_with_other_primary_metric_is_prepared_correctly(self):
+    processed_data = data_preparation.prepare_and_validate_historical_data(
+        self.raw_data,
+        item_id_column="Item ID",
+        date_column="YYYY-MM-DD",
+        primary_metric="other",
+        primary_metric_column="other_metric",
+        rng=np.random.default_rng(seed=42),
+    )
+
+    expected_processed_data = pd.DataFrame({
+        "item_id": ["1", "1", "2", "2"],
+        "week_start": pd.to_datetime(
+            ["2023-10-01", "2023-10-08", "2023-10-01", "2023-10-08"]
+        ),
+        "week_id": [0, 1, 0, 1],
+        "other_metric": [5.0, 2.0, 1.0, 0.0],
+    })
+    pd.testing.assert_frame_equal(
+        processed_data, expected_processed_data, check_like=True
+    )
+
+  def test_validate_historical_data_is_called(self):
+    with mock.patch(
+        "google3.third_party.professional_services.solutions.feedx.feedx.data_preparation.validate_historical_data",
+        side_effect=data_preparation.validate_historical_data,
+    ) as mock_validate_historical_data:
+      data_preparation.prepare_and_validate_historical_data(
+          self.raw_data,
+          item_id_column="Item ID",
+          date_column="YYYY-MM-DD",
+          primary_metric="clicks",
+          primary_metric_column="Clicks",
+          rng=np.random.default_rng(seed=42),
+      )
+      mock_validate_historical_data.assert_called()
+
+  def test_standardize_column_names_and_types_is_called(self):
+    with mock.patch(
+        "google3.third_party.professional_services.solutions.feedx.feedx.data_preparation.standardize_column_names_and_types",
+        side_effect=data_preparation.standardize_column_names_and_types,
+    ) as mock_standardize_column_names_and_types:
+      data_preparation.prepare_and_validate_historical_data(
+          self.raw_data,
+          item_id_column="Item ID",
+          date_column="YYYY-MM-DD",
+          primary_metric="clicks",
+          primary_metric_column="Clicks",
+          rng=np.random.default_rng(seed=42),
+      )
+      mock_standardize_column_names_and_types.assert_called()
+
+  def test_fill_missing_rows_with_zeros_is_called(self):
+    with mock.patch(
+        "google3.third_party.professional_services.solutions.feedx.feedx.data_preparation.fill_missing_rows_with_zeros",
+        side_effect=data_preparation.fill_missing_rows_with_zeros,
+    ) as mock_fill_missing_rows_with_zeros:
+      data_preparation.prepare_and_validate_historical_data(
+          self.raw_data,
+          item_id_column="Item ID",
+          date_column="YYYY-MM-DD",
+          primary_metric="clicks",
+          primary_metric_column="Clicks",
+          rng=np.random.default_rng(seed=42),
+      )
+      mock_fill_missing_rows_with_zeros.assert_called()
+
+  def test_add_week_id_and_week_start_is_called(self):
+    with mock.patch(
+        "google3.third_party.professional_services.solutions.feedx.feedx.data_preparation.add_week_id_and_week_start",
+        side_effect=data_preparation.add_week_id_and_week_start,
+    ) as mock_add_week_id_and_week_start:
+      data_preparation.prepare_and_validate_historical_data(
+          self.raw_data,
+          item_id_column="Item ID",
+          date_column="YYYY-MM-DD",
+          primary_metric="clicks",
+          primary_metric_column="Clicks",
+          rng=np.random.default_rng(seed=42),
+      )
+      mock_add_week_id_and_week_start.assert_called()
+
+  def test_group_data_to_complete_weeks_is_called(self):
+    with mock.patch(
+        "google3.third_party.professional_services.solutions.feedx.feedx.data_preparation.group_data_to_complete_weeks",
+        side_effect=data_preparation.group_data_to_complete_weeks,
+    ) as mock_group_data_to_complete_weeks:
+      data_preparation.prepare_and_validate_historical_data(
+          self.raw_data,
+          item_id_column="Item ID",
+          date_column="YYYY-MM-DD",
+          primary_metric="clicks",
+          primary_metric_column="Clicks",
+          rng=np.random.default_rng(seed=42),
+      )
+      mock_group_data_to_complete_weeks.assert_called()
+
+  def test_downsample_items_is_called(self):
+    with mock.patch(
+        "google3.third_party.professional_services.solutions.feedx.feedx.data_preparation.downsample_items",
+        side_effect=data_preparation.downsample_items,
+    ) as mock_downsample_items:
+      data_preparation.prepare_and_validate_historical_data(
+          self.raw_data,
+          item_id_column="Item ID",
+          date_column="YYYY-MM-DD",
+          primary_metric="clicks",
+          primary_metric_column="Clicks",
+          rng=np.random.default_rng(seed=42),
+      )
+      mock_downsample_items.assert_called()
+
+  def test_raises_exception_for_unknown_metric(self):
+    with self.assertRaisesWithLiteralMatch(
+        ValueError,
+        "The primary_metric must be one of ['clicks', 'impressions',"
+        " 'conversions', 'total_conversion_value', 'total_cost', 'other']."
+    ):
+      data_preparation.prepare_and_validate_historical_data(
+          self.raw_data,
+          item_id_column="Item ID",
+          date_column="YYYY-MM-DD",
+          primary_metric="unknown_metric",
+          primary_metric_column="Clicks",
+          rng=np.random.default_rng(seed=42),
+      )
 
 
 if __name__ == "__main__":

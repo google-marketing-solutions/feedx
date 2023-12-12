@@ -821,3 +821,108 @@ def add_at_least_one_metrics(
       )
     data[at_least_one_metric] = (data[metric] > 0).astype(int)
   return data
+
+
+def prepare_and_validate_historical_data(
+    raw_data: pd.DataFrame,
+    *,
+    item_id_column: str,
+    date_column: str,
+    primary_metric: str,
+    primary_metric_column: str,
+    rng: np.random.RandomState,
+    item_sample_fraction: float = 1.0,
+    require_positive_primary_metric: bool = True,
+) -> pd.DataFrame:
+  """Prepares and validates the historical data for the experiment design.
+
+  This performs the following steps before returning the cleaned data:
+
+    1. Standardize the column names and types.
+    2. Fill any missing date + item_id combinations with zeros.
+    3. Add a week_id and week start date column, and group the data so that
+       it's weekly if it's not already (weeks are aligned to start on the
+       minimum date).
+    4. Downsample items if required.
+    5. Perform validation checks on the data.
+
+  Args:
+    raw_data: The raw data to be processed and validated.
+    item_id_column: The name of the column containing the item ids.
+    date_column: The name of the column containing the dates.
+    primary_metric: The name of the primary metric that will be used. Must be
+      one of clicks, impressions, conversions, total_conversion_value,
+      total_cost or other.
+    primary_metric_column: The column name containing the primary metric.
+    rng: The random number generator used if downsampling is applied.
+    item_sample_fraction: The faction of items to sample if doing downsampling.
+      If set to 1, no downsampling is done. Defaults to 1.
+    require_positive_primary_metric: Whether the primary metric should always be
+      positive or not. Defaults to true.
+
+  Returns:
+    The processed data.
+  """
+  allowed_primary_metrics = [
+      "clicks",
+      "impressions",
+      "conversions",
+      "total_conversion_value",
+      "total_cost",
+      "other",
+  ]
+  if primary_metric not in allowed_primary_metrics:
+    raise ValueError(
+        f"The primary_metric must be one of {allowed_primary_metrics}."
+    )
+
+  standardize_column_names_and_types_args = {
+      "date_column": date_column,
+      "item_id_column": item_id_column,
+  }
+
+  if primary_metric == "other":
+    standardize_column_names_and_types_args["custom_columns"] = {
+        primary_metric_column: primary_metric_column
+    }
+    standardize_column_names_and_types_args["custom_parse_functions"] = {
+        primary_metric_column: lambda x: x.astype(float)
+    }
+    primary_metric = primary_metric_column
+  else:
+    standardize_column_names_and_types_args[primary_metric + "_column"] = (
+        primary_metric_column
+    )
+
+  clean_data = (
+      raw_data.pipe(
+          standardize_column_names_and_types,
+          **standardize_column_names_and_types_args,
+      )
+      .pipe(fill_missing_rows_with_zeros)
+      .pipe(add_week_id_and_week_start, date_column="date")
+      .pipe(
+          group_data_to_complete_weeks,
+          date_column="date",
+          item_id_column="item_id",
+          week_id_column="week_id",
+          week_start_column="week_start",
+      )
+      .pipe(
+          downsample_items,
+          downsample_fraction=item_sample_fraction,
+          item_id_column="item_id",
+          rng=rng,
+      )
+  )
+
+  validate_historical_data(
+      clean_data,
+      item_id_column="item_id",
+      date_column="week_start",
+      date_id_column="week_id",
+      primary_metric_column=primary_metric,
+      require_positive_primary_metric=require_positive_primary_metric,
+  )
+
+  return clean_data
