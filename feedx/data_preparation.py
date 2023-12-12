@@ -801,6 +801,46 @@ def _validate_experiment_dates_match(
   print("Date range matches design, check passed.")
 
 
+def _validate_treatment_assignment_is_unique_for_each_item_id(
+    experiment_data: pd.DataFrame,
+    item_id_column: str,
+    treatment_assignment_column: str,
+) -> None:
+  n_assignments = experiment_data.groupby(item_id_column)[
+      treatment_assignment_column
+  ].nunique()
+  if np.any(n_assignments != 1):
+    raise ValueError(
+        "Some items have non-unique treatment assignments:"
+        f" {n_assignments[n_assignments != 1]}"
+    )
+
+  print("Treatment assignment is unique for each item, check passed.")
+
+
+def _validate_coinflip_matches_assignments(
+    experiment_data: pd.DataFrame,
+    design: experiment_design.ExperimentDesign,
+    treatment_assignment_column: str,
+    item_id_column: str,
+) -> None:
+  actual_assignments = experiment_data[treatment_assignment_column].values
+  coinflip = experiment_design.Coinflip(salt=design.coinflip_salt)
+  expected_assignments = experiment_data[item_id_column].apply(coinflip).values
+
+  if not np.array_equal(actual_assignments, expected_assignments):
+    fraction_wrong = np.mean(actual_assignments != expected_assignments)
+    number_wrong = np.sum(actual_assignments != expected_assignments)
+    raise ValueError(
+        f"{number_wrong} ({fraction_wrong:.2%}) of the treatment assigments in"
+        " the data do not match what was expected from the coinflip salt in"
+        " the design. This could mean you have loaded the wrong design or"
+        " treatment assignment files."
+    )
+
+  print("Coinflip salt from design matches assignments, check passed.")
+
+
 def validate_historical_data(
     historical_data: pd.DataFrame,
     item_id_column: str,
@@ -867,6 +907,7 @@ def validate_experiment_data(
     item_id_column: str,
     date_column: str,
     date_id_column: str,
+    treatment_assignment_column: str,
     metric_columns: Collection[str],
     experiment_start_date: str,
     experiment_has_concluded: bool = True,
@@ -890,6 +931,9 @@ def validate_experiment_data(
     given the experiment start date and the runtime and pretest weeks. If
     experiment_has_concluded is set to False, it only checks the earliest date.
   - The primary metric exists as a column in the data.
+  - Check that the treatment assignments are unique for each item and they match
+    what is expected from the coinflip salt. If they don't match the salt,
+    it means the design or treatment assignments dont match.
 
   Args:
     experiment_data: The experiment data to be validated.
@@ -898,6 +942,9 @@ def validate_experiment_data(
     date_column: The column in the data containing the date. This column must
       have a datetime type.
     date_id_column: The column containing an integer identifier for the dates.
+    treatment_assignment_column: The column containing the treatment assignment,
+      0 if the item is in the control group and 1 if it is in the treatment
+      group.
     metric_columns: The columns containing the metrics to be analyzed. Must
       include the primary metric from the design.
     experiment_start_date: The date the experiment started. Must have the format
@@ -958,6 +1005,13 @@ def validate_experiment_data(
       date_column=date_column,
       experiment_start_date=experiment_start_date,
       experiment_has_concluded=experiment_has_concluded,
+  )
+
+  _validate_treatment_assignment_is_unique_for_each_item_id(
+      experiment_data, item_id_column, treatment_assignment_column
+  )
+  _validate_coinflip_matches_assignments(
+      experiment_data, design, treatment_assignment_column, item_id_column
   )
 
 

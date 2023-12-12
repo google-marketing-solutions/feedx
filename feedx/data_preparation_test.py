@@ -527,6 +527,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         pre_trim_bottom_percentile=0.0,
         post_trim_percentile=0.0,
         primary_metric="clicks",
+        coinflip_salt="ab12",
     )
 
   @mock_experiment_design_validation
@@ -541,6 +542,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         "item_id": ["1", "2", "1", "2"],
         "clicks": [1, 2, 3, 4],
         "impressions": [10, 12, 13, 14],
+        "treatment_assignment": [0, 1, 0, 1],
     })
     design = experiment_design.ExperimentDesign(
         n_items_before_trimming=2,
@@ -557,6 +559,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         date_id_column="date_id",
         metric_columns=["clicks", "impressions"],
         experiment_start_date="2023-10-01",
+        treatment_assignment_column="treatment_assignment",
     )
 
   @mock_experiment_design_validation
@@ -571,6 +574,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         "item_id": ["1", "2", "1", "2"],
         "clicks": [1, 2, 3, 4],
         "impressions": [10, 12, 13, 14],
+        "treatment_assignment": [0, 1, 0, 1],
     })
     design = experiment_design.ExperimentDesign(
         n_items_before_trimming=2,
@@ -587,6 +591,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         date_id_column="date_id",
         metric_columns=["clicks", "impressions"],
         experiment_start_date="2023-10-01",
+        treatment_assignment_column="treatment_assignment",
     )
 
   @mock_experiment_design_validation
@@ -605,6 +610,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         "item_id": ["1", "2", "1", "2", "2"],
         "clicks": [1, 2, 3, 4, 5],
         "impressions": [10, 12, 13, 14, 15],
+        "treatment_assignment": [0, 1, 0, 1, 1],
     })
     design = experiment_design.ExperimentDesign(
         n_items_before_trimming=2,
@@ -622,6 +628,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
           date_id_column="date_id",
           metric_columns=["clicks", "impressions"],
           experiment_start_date="2023-10-01",
+          treatment_assignment_column="treatment_assignment",
       )
 
   @mock_experiment_design_validation
@@ -634,6 +641,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         "item_id": ["1", "2", "1"],
         "clicks": [1, 2, 3],
         "impressions": [10, 12, 13],
+        "treatment_assignment": [0, 1, 0],
     })
     design = experiment_design.ExperimentDesign(
         n_items_before_trimming=2,
@@ -651,6 +659,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
           date_id_column="date_id",
           metric_columns=["clicks", "impressions"],
           experiment_start_date="2023-10-01",
+          treatment_assignment_column="treatment_assignment",
       )
 
   @mock_experiment_design_validation
@@ -663,6 +672,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         "item_id": ["1", "2", "1", "2"],
         "clicks": [1, 2, 3, None],
         "impressions": [10, 12, None, 14],
+        "treatment_assignment": [0, 1, 0, 1],
     })
     design = experiment_design.ExperimentDesign(
         n_items_before_trimming=2,
@@ -680,6 +690,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
           date_id_column="date_id",
           metric_columns=["clicks", "impressions"],
           experiment_start_date="2023-10-01",
+          treatment_assignment_column="treatment_assignment",
       )
 
   @mock_experiment_design_validation
@@ -694,6 +705,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         "item_id": ["1", "2", "1", "2"],
         "clicks": [1, 2, 3, 4],
         "impressions": [10, 12, 13, 14],
+        "treatment_assignment": [0, 1, 0, 1],
     })
     design = experiment_design.ExperimentDesign(
         n_items_before_trimming=2,
@@ -711,6 +723,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
           date_id_column="date_id",
           metric_columns=["clicks", "impressions"],
           experiment_start_date="2023-10-01",
+          treatment_assignment_column="treatment_assignment",
       )
 
   @mock_experiment_design_validation
@@ -725,6 +738,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         "item_id": ["1", "2", "1", "2"],
         "clicks": [1, 2, 3, 4],
         "impressions": [10, 12, 13, 14],
+        "treatment_assignment": [0, 1, 0, 1],
     })
     design = experiment_design.ExperimentDesign(
         n_items_before_trimming=2,
@@ -742,6 +756,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
           date_id_column="date_id",
           metric_columns=["clicks", "impressions"],
           experiment_start_date="2023-10-01",
+          treatment_assignment_column="treatment_assignment",
       )
 
   @mock_experiment_design_validation
@@ -756,6 +771,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         "item_id": ["1", "2", "1", "2"],
         "clicks": [1, 2, 3, np.inf],
         "impressions": [10, 12, np.inf, 14],
+        "treatment_assignment": [0, 1, 0, 1],
     })
     design = experiment_design.ExperimentDesign(
         n_items_before_trimming=2,
@@ -773,6 +789,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
           date_id_column="date_id",
           metric_columns=["clicks", "impressions"],
           experiment_start_date="2023-10-01",
+          treatment_assignment_column="treatment_assignment",
       )
 
   @mock_experiment_design_validation
@@ -787,6 +804,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         "item_id": ["1", "2", "1", "2"],
         "clicks": [1, 2, 3, -1],
         "impressions": [10, 12, 13, 14],
+        "treatment_assignment": [0, 1, 0, 1],
     })
     design = experiment_design.ExperimentDesign(
         n_items_before_trimming=2,
@@ -804,6 +822,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
           date_id_column="date_id",
           metric_columns=["clicks", "impressions"],
           experiment_start_date="2023-10-01",
+          treatment_assignment_column="treatment_assignment",
       )
 
   @mock_experiment_design_validation
@@ -816,6 +835,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         "item_id": ["1", "2", "1", "2"],
         "clicks": [1, 2, 3, 4],
         "impressions": [10, 12, 13, 14],
+        "treatment_assignment": [0, 1, 0, 1],
     })
     design = experiment_design.ExperimentDesign(
         n_items_before_trimming=4,
@@ -832,6 +852,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
           date_id_column="date_id",
           metric_columns=["clicks", "impressions"],
           experiment_start_date="2023-10-01",
+          treatment_assignment_column="treatment_assignment",
       )
 
   @mock_experiment_design_validation
@@ -846,6 +867,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         "item_id": ["1", "2", "1", "2"],
         "clicks": [1, 2, 3, -1],
         "impressions": [10, 12, 13, 14],
+        "treatment_assignment": [0, 1, 0, 1],
     })
     design = experiment_design.ExperimentDesign(
         n_items_before_trimming=2,
@@ -863,6 +885,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         metric_columns=["clicks", "impressions"],
         can_be_negative_metric_columns=["clicks"],
         experiment_start_date="2023-10-01",
+        treatment_assignment_column="treatment_assignment",
     )
 
   @mock_experiment_design_validation
@@ -876,6 +899,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         "date_id": [1, 1, 3, 3],
         "item_id": ["1", "2", "1", "2"],
         "clicks": [1, 2, 3, 1],
+        "treatment_assignment": [0, 1, 0, 1],
     })
     design = experiment_design.ExperimentDesign(
         n_items_before_trimming=2,
@@ -893,6 +917,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
           date_id_column="date_id",
           metric_columns=["clicks", "impressions"],
           experiment_start_date="2023-10-01",
+          treatment_assignment_column="treatment_assignment",
       )
 
   @mock_experiment_design_validation
@@ -906,6 +931,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         "date_id": ["1", "1", "2", "2"],
         "item_id": ["1", "2", "1", "2"],
         "clicks": [1, 2, 3, 1],
+        "treatment_assignment": [0, 1, 0, 1],
     })
     design = experiment_design.ExperimentDesign(
         n_items_before_trimming=2,
@@ -923,6 +949,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
           date_id_column="date_id",
           metric_columns=["clicks", "impressions"],
           experiment_start_date="2023-10-01",
+          treatment_assignment_column="treatment_assignment",
       )
 
   @mock_experiment_design_validation
@@ -935,6 +962,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         "item_id": ["1", "2", "1", "2"],
         "clicks": [1, 2, 3, 4],
         "impressions": [10, 12, 13, 14],
+        "treatment_assignment": [0, 1, 0, 1],
     })
     design = experiment_design.ExperimentDesign(
         n_items_before_trimming=2,
@@ -951,6 +979,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
           date_id_column="date_id",
           metric_columns=["clicks", "impressions"],
           experiment_start_date="2023-10-01",
+          treatment_assignment_column="treatment_assignment",
       )
 
   @mock_experiment_design_validation
@@ -963,6 +992,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         "item_id": ["1", "2", "1", "2"],
         "clicks": [1, 2, 3, 4],
         "impressions": [10, 12, 13, 14],
+        "treatment_assignment": [0, 1, 0, 1],
     })
     design = experiment_design.ExperimentDesign(
         n_items_before_trimming=2,
@@ -979,6 +1009,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
           date_id_column="date_id",
           metric_columns=["clicks", "impressions"],
           experiment_start_date="2023-10-01",
+          treatment_assignment_column="treatment_assignment",
       )
 
   @mock_experiment_design_validation
@@ -993,6 +1024,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         "item_id": ["1", "2", "1", "2"],
         "clicks": [1, 2, 3, 4],
         "impressions": [10, 12, 13, 14],
+        "treatment_assignment": [0, 1, 0, 1],
     })
     design = experiment_design.ExperimentDesign(
         n_items_before_trimming=2,
@@ -1009,6 +1041,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         metric_columns=["clicks", "impressions"],
         experiment_start_date="2023-10-01",
         experiment_has_concluded=False,
+        treatment_assignment_column="treatment_assignment",
     )
 
   @mock_experiment_design_validation
@@ -1023,6 +1056,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         "item_id": ["1", "2", "1", "2"],
         "clicks": [1, 2, 3, 4],
         "impressions": [10, 12, 13, 14],
+        "treatment_assignment": [0, 1, 0, 1],
     })
     design = experiment_design.ExperimentDesign(
         n_items_before_trimming=2,
@@ -1039,6 +1073,71 @@ class ValidateExperimentDataTests(parameterized.TestCase):
           date_id_column="date_id",
           metric_columns=["impressions"],
           experiment_start_date="2023-10-01",
+          treatment_assignment_column="treatment_assignment",
+      )
+
+  @mock_experiment_design_validation
+  def test_treatment_assignment_must_be_unique_for_each_item_id(
+      self, mock_experiment_design
+  ):
+    experiment_data = pd.DataFrame({
+        "date": pd.to_datetime(
+            ["2023-10-01", "2023-10-01", "2023-10-08", "2023-10-08"]
+        ),
+        "date_id": [1, 1, 2, 2],
+        "item_id": ["1", "2", "1", "2"],
+        "clicks": [1, 2, 3, 4],
+        "impressions": [10, 12, 13, 14],
+        "treatment_assignment": [0, 1, 1, 1],
+    })
+    design = experiment_design.ExperimentDesign(
+        n_items_before_trimming=2,
+        runtime_weeks=2,
+        pretest_weeks=0,
+        **self.irrelevant_design_args
+    )
+    with self.assertRaises(ValueError):
+      data_preparation.validate_experiment_data(
+          experiment_data,
+          design=design,
+          item_id_column="item_id",
+          date_column="date",
+          date_id_column="date_id",
+          metric_columns=["clicks", "impressions"],
+          experiment_start_date="2023-10-01",
+          treatment_assignment_column="treatment_assignment",
+      )
+
+  @mock_experiment_design_validation
+  def test_treatment_assignment_must_match_whats_expected_from_coinflip_salt(
+      self, mock_experiment_design
+  ):
+    experiment_data = pd.DataFrame({
+        "date": pd.to_datetime(
+            ["2023-10-01", "2023-10-01", "2023-10-08", "2023-10-08"]
+        ),
+        "date_id": [1, 1, 2, 2],
+        "item_id": ["1", "2", "1", "2"],
+        "clicks": [1, 2, 3, 4],
+        "impressions": [10, 12, 13, 14],
+        "treatment_assignment": [1, 1, 1, 1],
+    })
+    design = experiment_design.ExperimentDesign(
+        n_items_before_trimming=2,
+        runtime_weeks=2,
+        pretest_weeks=0,
+        **self.irrelevant_design_args
+    )
+    with self.assertRaises(ValueError):
+      data_preparation.validate_experiment_data(
+          experiment_data,
+          design=design,
+          item_id_column="item_id",
+          date_column="date",
+          date_id_column="date_id",
+          metric_columns=["clicks", "impressions"],
+          experiment_start_date="2023-10-01",
+          treatment_assignment_column="treatment_assignment",
       )
 
 
