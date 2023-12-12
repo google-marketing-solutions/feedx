@@ -1336,7 +1336,7 @@ def perform_treatment_assignment(
     design: experiment_design.ExperimentDesign,
     rng: np.random.Generator,
     item_id_column: str,
-    week_id_column: str,
+    week_id_column: str | None = None,
     treatment_assignment_column: str = "treatment_assignment",
 ) -> pd.DataFrame:
   """Returns the items for the experiment with their treatment assignment.
@@ -1358,7 +1358,9 @@ def perform_treatment_assignment(
     item_id_column: The name of the column in historical_data containing the
       item identifier.
     week_id_column: The name of the column in historical_data containing the
-      week identifier.
+      week identifier. This is only used to apply pre-test trimming, if the
+      design does do pre-test trimming this can be set to None. Defaults to
+      None.
     treatment_assignment_column: The name of the output column that will contain
       the treatment assignment. Defaults to "treatment_assignment".
 
@@ -1368,12 +1370,21 @@ def perform_treatment_assignment(
     coinflip salt.
 
   Raises:
-    ValueError: If the item_id_column or week_id_column are not in the
-      historical_data, or if the treatment_assignment_column is the same as the
-      item_id_column.
+    ValueError: If the item_id_column or week_id_column (if it's needed) are not
+      in the historical_data, or if the treatment_assignment_column is the same
+      as the item_id_column.
   """
+  design_has_pre_trimming = (
+      design.pre_trim_top_percentile > 0.0
+      or design.pre_trim_bottom_percentile > 0.0
+  )
 
-  required_columns = {item_id_column, week_id_column}
+  required_columns = {item_id_column}
+  if design_has_pre_trimming & (week_id_column is not None):
+    required_columns.add(week_id_column)
+  elif design_has_pre_trimming:
+    raise ValueError("Must specify week_id_column if design has pre-trimming.")
+
   missing_columns = required_columns - set(historical_data.columns)
   if missing_columns:
     raise ValueError(
@@ -1395,24 +1406,29 @@ def perform_treatment_assignment(
     design.coinflip_salt = coinflip.salt
     print(f"Generating random coinflip salt: {coinflip.salt}")
 
-  max_week_id = historical_data[week_id_column].max()
-  start_week_id = max_week_id - design.pretest_weeks
-  pretest_data = historical_data.loc[
-      historical_data[week_id_column] > start_week_id
-  ].copy()
-  pretest_items = (
-      pretest_data.groupby(item_id_column)[design.primary_metric]
-      .sum()
-      .reset_index()
-  )
+  if design_has_pre_trimming:
+    max_week_id = historical_data[week_id_column].max()
+    start_week_id = max_week_id - design.pretest_weeks
+    pretest_data = historical_data.loc[
+        historical_data[week_id_column] > start_week_id
+    ].copy()
+    pretest_items = (
+        pretest_data.groupby(item_id_column)[design.primary_metric]
+        .sum()
+        .reset_index()
+    )
 
-  experiment_items = trim_outliers(
-      pretest_items,
-      order_by=design.primary_metric,
-      trim_percentile_bottom=design.pre_trim_bottom_percentile,
-      trim_percentile_top=design.pre_trim_top_percentile,
-      rng=rng,
-  )[[item_id_column]]
+    experiment_items = trim_outliers(
+        pretest_items,
+        order_by=design.primary_metric,
+        trim_percentile_bottom=design.pre_trim_bottom_percentile,
+        trim_percentile_top=design.pre_trim_top_percentile,
+        rng=rng,
+    )[[item_id_column]]
+  else:
+    experiment_items = (
+        historical_data[[item_id_column]].copy().drop_duplicates()
+    )
 
   experiment_items[treatment_assignment_column] = experiment_items[
       item_id_column

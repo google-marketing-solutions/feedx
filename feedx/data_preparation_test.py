@@ -1770,9 +1770,9 @@ class PerformTreatmentAssignmentTests(parameterized.TestCase):
         pretest_weeks=1,
         is_crossover=True,
         crossover_washout_weeks=1,
+        post_trim_percentile=0.0,
         pre_trim_top_percentile=0.2,
         pre_trim_bottom_percentile=0.1,
-        post_trim_percentile=0.0,
     )
 
   @parameterized.parameters(["item_id", "week_id"])
@@ -1787,6 +1787,30 @@ class PerformTreatmentAssignmentTests(parameterized.TestCase):
           rng=np.random.default_rng(123),
           item_id_column="item_id",
           week_id_column="week_id",
+      )
+
+  def test_perform_treatment_assignment_does_not_require_week_id_if_no_pre_trimming(
+      self,
+  ):
+    self.design.pre_trim_top_percentile = 0.0
+    self.design.pre_trim_bottom_percentile = 0.0
+    self.historical_data.drop("week_id", axis=1, inplace=True)
+    data_preparation.perform_treatment_assignment(
+        historical_data=self.historical_data,
+        design=self.design,
+        rng=np.random.default_rng(123),
+        item_id_column="item_id",
+    )
+
+  def test_perform_treatment_assignment_raises_exception_if_week_id_column_is_missing_and_pre_trimming(
+      self,
+  ):
+    with self.assertRaises(ValueError):
+      data_preparation.perform_treatment_assignment(
+          historical_data=self.historical_data,
+          design=self.design,
+          rng=np.random.default_rng(123),
+          item_id_column="item_id",
       )
 
   def test_perform_treatment_assignment_raises_if_item_id_column_equals_treatment_assignment_column(
