@@ -793,6 +793,76 @@ def validate_historical_data(
   )
 
 
+def validate_experiment_data(
+    experiment_data: pd.DataFrame,
+    *,
+    item_id_column: str,
+    date_column: str,
+    date_id_column: str,
+    metric_columns: Collection[str],
+    can_be_negative_metric_columns: Collection[str] | None = None,
+) -> None:
+  """Runs all the required validation for the experiment data.
+
+  This validates that:
+
+  - There are no null or n/a values in the data.
+  - All items have exactly 1 row for every date, there are no missing
+    date / item combinations or duplicates.
+  - The dates are either daily or weekly.
+  - All metrics are finite. This is stricter than non-null as it ensures
+    they are numeric and not infinite.
+  - The date_id must be integers and consecutive.
+  - The metrics are not negative, unless they are in
+    can_be_negative_metric_columns.
+
+  Args:
+    experiment_data: The experiment data to be validated.
+    item_id_column: The column in the data contining the item identifier.
+    date_column: The column in the data containing the date. This column must
+      have a datetime type.
+    date_id_column: The column containing an integer identifier for the dates.
+    metric_columns: The columns containing the metrics to be analyzed.
+    can_be_negative_metric_columns: The list of metric columns that are allowed
+      to be negative. Defaults to None, meaning all metrics must be positive.
+
+  Raises:
+    ValueError: If any of the validations fail.
+  """
+  _validate_no_null_values(experiment_data)
+  _validate_every_value_exists_exactly_once_for_every_group(
+      experiment_data,
+      group_column=date_column,
+      value_column=item_id_column,
+  )
+  _validate_dates_are_either_daily_or_weekly(
+      experiment_data, date_column=date_column, date_id_column=date_id_column
+  )
+  _validate_date_ids_are_consecutive_integers(experiment_data, date_id_column)
+  _validate_all_metrics_are_finite(
+      experiment_data, metric_columns=metric_columns
+  )
+
+  can_be_negative_metric_columns = can_be_negative_metric_columns or []
+  require_non_negative_metric_columns = [
+      metric_column
+      for metric_column in metric_columns
+      if metric_column not in can_be_negative_metric_columns
+  ]
+  if require_non_negative_metric_columns:
+    _validate_all_metrics_are_positive(
+        experiment_data,
+        metric_columns=require_non_negative_metric_columns,
+        required=True,
+    )
+  if can_be_negative_metric_columns:
+    _validate_all_metrics_are_positive(
+        experiment_data,
+        metric_columns=can_be_negative_metric_columns,
+        required=False,
+    )
+
+
 def add_at_least_one_metrics(
     data: pd.DataFrame, metrics: dict[str, str]
 ) -> pd.DataFrame:
