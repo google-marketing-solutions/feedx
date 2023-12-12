@@ -753,6 +753,54 @@ def _validate_number_of_items_matches_design(
   print("Number of items matches design, check passed.")
 
 
+def _validate_experiment_dates_match(
+    experiment_data: pd.DataFrame,
+    design: experiment_design.ExperimentDesign,
+    date_column: str,
+    experiment_start_date: str,
+    experiment_has_concluded: bool,
+) -> None:
+  """Validates that the experiment dates match.
+
+  This checks that the data contains the earliest and latest dates required,
+  based on the runtime and pretest weeks in the design and the experiment start
+  date.
+  """
+  start_date_dt = dt.datetime.strptime(experiment_start_date, "%Y-%m-%d")
+  # first day of first pretest week
+  expected_min_date = start_date_dt - dt.timedelta(
+      days=design.pretest_weeks * 7
+  )
+  # first day of final runtime week
+  expected_max_date = start_date_dt + dt.timedelta(
+      days=(design.runtime_weeks - 1) * 7
+  )
+
+  actual_min_date = experiment_data[date_column].min()
+  actual_max_date = experiment_data[date_column].max()
+
+  if actual_min_date > expected_min_date:
+    raise ValueError(
+        "Experiment data does not go back far enough. Design expects"
+        f" {design.pretest_weeks} weeks of pretest data, and experiment starts"
+        f" on {experiment_start_date}, so the first date must be"
+        f" {expected_min_date} or earlier, but the earliest date is"
+        f" {actual_min_date}"
+    )
+
+  if experiment_has_concluded:
+    if actual_max_date < expected_max_date:
+      raise ValueError(
+          "The experiment has concluded but you are missing data from the end"
+          f" of the experiment. Design expects {design.runtime_weeks} weeks of"
+          f" runtime data, and experiment starts on {experiment_start_date}, so"
+          f" the final week must be {expected_max_date} or later, but latest"
+          f" date is {actual_max_date}."
+      )
+
+  print("Date range matches design, check passed.")
+
+
 def validate_historical_data(
     historical_data: pd.DataFrame,
     item_id_column: str,
@@ -820,6 +868,8 @@ def validate_experiment_data(
     date_column: str,
     date_id_column: str,
     metric_columns: Collection[str],
+    experiment_start_date: str,
+    experiment_has_concluded: bool = True,
     can_be_negative_metric_columns: Collection[str] | None = None,
 ) -> None:
   """Runs all the required validation for the experiment data.
@@ -836,6 +886,9 @@ def validate_experiment_data(
   - The metrics are not negative, unless they are in
     can_be_negative_metric_columns.
   - The number of items in the data matches the expected number in the design.
+  - The earliest and last date in the data match what is required for the design
+    given the experiment start date and the runtime and pretest weeks. If
+    experiment_has_concluded is set to False, it only checks the earliest date.
 
   Args:
     experiment_data: The experiment data to be validated.
@@ -845,6 +898,10 @@ def validate_experiment_data(
       have a datetime type.
     date_id_column: The column containing an integer identifier for the dates.
     metric_columns: The columns containing the metrics to be analyzed.
+    experiment_start_date: The date the experiment started. Must have the format
+      YYYY-MM-DD.
+    experiment_has_concluded: Has the experiment finished (reached it's planned
+      runtime)? Defaults to True.
     can_be_negative_metric_columns: The list of metric columns that are allowed
       to be negative. Defaults to None, meaning all metrics must be positive.
 
@@ -886,6 +943,13 @@ def validate_experiment_data(
 
   _validate_number_of_items_matches_design(
       experiment_data, design, item_id_column
+  )
+  _validate_experiment_dates_match(
+      experiment_data,
+      design=design,
+      date_column=date_column,
+      experiment_start_date=experiment_start_date,
+      experiment_has_concluded=experiment_has_concluded,
   )
 
 

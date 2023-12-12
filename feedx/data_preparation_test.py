@@ -544,7 +544,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
     })
     design = experiment_design.ExperimentDesign(
         n_items_before_trimming=2,
-        runtime_weeks=2,
+        runtime_weeks=1,
         pretest_weeks=0,
         **self.irrelevant_design_args
     )
@@ -556,6 +556,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         date_column="date",
         date_id_column="date_id",
         metric_columns=["clicks", "impressions"],
+        experiment_start_date="2023-10-01",
     )
 
   @mock_experiment_design_validation
@@ -585,6 +586,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         date_column="date",
         date_id_column="date_id",
         metric_columns=["clicks", "impressions"],
+        experiment_start_date="2023-10-01",
     )
 
   @mock_experiment_design_validation
@@ -619,6 +621,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
           date_column="date",
           date_id_column="date_id",
           metric_columns=["clicks", "impressions"],
+          experiment_start_date="2023-10-01",
       )
 
   @mock_experiment_design_validation
@@ -647,6 +650,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
           date_column="date",
           date_id_column="date_id",
           metric_columns=["clicks", "impressions"],
+          experiment_start_date="2023-10-01",
       )
 
   @mock_experiment_design_validation
@@ -675,6 +679,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
           date_column="date",
           date_id_column="date_id",
           metric_columns=["clicks", "impressions"],
+          experiment_start_date="2023-10-01",
       )
 
   @mock_experiment_design_validation
@@ -705,6 +710,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
           date_column="date",
           date_id_column="date_id",
           metric_columns=["clicks", "impressions"],
+          experiment_start_date="2023-10-01",
       )
 
   @mock_experiment_design_validation
@@ -735,6 +741,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
           date_column="date",
           date_id_column="date_id",
           metric_columns=["clicks", "impressions"],
+          experiment_start_date="2023-10-01",
       )
 
   @mock_experiment_design_validation
@@ -765,6 +772,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
           date_column="date",
           date_id_column="date_id",
           metric_columns=["clicks", "impressions"],
+          experiment_start_date="2023-10-01",
       )
 
   @mock_experiment_design_validation
@@ -795,6 +803,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
           date_column="date",
           date_id_column="date_id",
           metric_columns=["clicks", "impressions"],
+          experiment_start_date="2023-10-01",
       )
 
   @mock_experiment_design_validation
@@ -822,6 +831,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
           date_column="date",
           date_id_column="date_id",
           metric_columns=["clicks", "impressions"],
+          experiment_start_date="2023-10-01",
       )
 
   @mock_experiment_design_validation
@@ -830,7 +840,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
   ):
     good_experiment_data = pd.DataFrame({
         "date": pd.to_datetime(
-            ["2023-10-01", "2023-10-01", "2023-10-02", "2023-10-02"]
+            ["2023-10-01", "2023-10-01", "2023-10-08", "2023-10-08"]
         ),
         "date_id": [1, 1, 2, 2],
         "item_id": ["1", "2", "1", "2"],
@@ -852,6 +862,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         date_id_column="date_id",
         metric_columns=["clicks", "impressions"],
         can_be_negative_metric_columns=["clicks"],
+        experiment_start_date="2023-10-01",
     )
 
   @mock_experiment_design_validation
@@ -881,6 +892,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
           date_column="date",
           date_id_column="date_id",
           metric_columns=["clicks", "impressions"],
+          experiment_start_date="2023-10-01",
       )
 
   @mock_experiment_design_validation
@@ -910,7 +922,94 @@ class ValidateExperimentDataTests(parameterized.TestCase):
           date_column="date",
           date_id_column="date_id",
           metric_columns=["clicks", "impressions"],
+          experiment_start_date="2023-10-01",
       )
+
+  @mock_experiment_design_validation
+  def test_earliest_date_must_match_design(self, mock_experiment_design):
+    experiment_data = pd.DataFrame({
+        "date": pd.to_datetime(
+            ["2023-10-01", "2023-10-01", "2023-10-08", "2023-10-08"]
+        ),
+        "date_id": [1, 1, 2, 2],
+        "item_id": ["1", "2", "1", "2"],
+        "clicks": [1, 2, 3, 4],
+        "impressions": [10, 12, 13, 14],
+    })
+    design = experiment_design.ExperimentDesign(
+        n_items_before_trimming=2,
+        runtime_weeks=2,
+        pretest_weeks=1,  # Requiring 1 week of pre-test but it's not in data
+        **self.irrelevant_design_args
+    )
+    with self.assertRaises(ValueError):
+      data_preparation.validate_experiment_data(
+          experiment_data,
+          design=design,
+          item_id_column="item_id",
+          date_column="date",
+          date_id_column="date_id",
+          metric_columns=["clicks", "impressions"],
+          experiment_start_date="2023-10-01",
+      )
+
+  @mock_experiment_design_validation
+  def test_last_date_must_match_design(self, mock_experiment_design):
+    experiment_data = pd.DataFrame({
+        "date": pd.to_datetime(
+            ["2023-10-01", "2023-10-01", "2023-10-08", "2023-10-08"]
+        ),
+        "date_id": [1, 1, 2, 2],
+        "item_id": ["1", "2", "1", "2"],
+        "clicks": [1, 2, 3, 4],
+        "impressions": [10, 12, 13, 14],
+    })
+    design = experiment_design.ExperimentDesign(
+        n_items_before_trimming=2,
+        runtime_weeks=3,  # Requiring 3 weeks of pre-test but it's not in data
+        pretest_weeks=0,
+        **self.irrelevant_design_args
+    )
+    with self.assertRaises(ValueError):
+      data_preparation.validate_experiment_data(
+          experiment_data,
+          design=design,
+          item_id_column="item_id",
+          date_column="date",
+          date_id_column="date_id",
+          metric_columns=["clicks", "impressions"],
+          experiment_start_date="2023-10-01",
+      )
+
+  @mock_experiment_design_validation
+  def test_last_date_may_not_match_design_if_experiment_has_concluded_is_false(
+      self, mock_experiment_design
+  ):
+    experiment_data = pd.DataFrame({
+        "date": pd.to_datetime(
+            ["2023-10-01", "2023-10-01", "2023-10-08", "2023-10-08"]
+        ),
+        "date_id": [1, 1, 2, 2],
+        "item_id": ["1", "2", "1", "2"],
+        "clicks": [1, 2, 3, 4],
+        "impressions": [10, 12, 13, 14],
+    })
+    design = experiment_design.ExperimentDesign(
+        n_items_before_trimming=2,
+        runtime_weeks=3,  # Requiring 3 weeks of pre-test but it's not in data
+        pretest_weeks=0,
+        **self.irrelevant_design_args
+    )
+    data_preparation.validate_experiment_data(
+        experiment_data,
+        design=design,
+        item_id_column="item_id",
+        date_column="date",
+        date_id_column="date_id",
+        metric_columns=["clicks", "impressions"],
+        experiment_start_date="2023-10-01",
+        experiment_has_concluded=False,
+    )
 
 
 class AddWeekIdAndWeekStartTests(parameterized.TestCase):
