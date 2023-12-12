@@ -18,3 +18,4 @@ pandas
 scipy
 tqdm
 pyyaml
+pillow>=10.0.1
