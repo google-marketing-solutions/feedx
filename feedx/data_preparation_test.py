@@ -1773,6 +1773,24 @@ class PerformTreatmentAssignmentTests(parameterized.TestCase):
         actual_assignments["item_id"].values, expected_item_ids
     )
 
+  def test_perform_treatment_assignment_checks_for_sample_ratio_mismatch(self):
+    with mock.patch(
+        "google3.third_party.professional_services.solutions.feedx.feedx.data_preparation.validate_no_sample_ratio_mismatch",
+        side_effect=data_preparation.validate_no_sample_ratio_mismatch,
+    ) as mock_validate_no_sample_ratio_mismatch:
+      actual_assignments = data_preparation.perform_treatment_assignment(
+          historical_data=self.historical_data,
+          design=self.design,
+          rng=np.random.default_rng(123),
+          item_id_column="item_id",
+          week_id_column="week_id",
+      )
+      mock_validate_no_sample_ratio_mismatch.assert_called_with(
+          actual_assignments,
+          item_id_column="item_id",
+          treatment_assignment_column="treatment_assignment",
+      )
+
 
 if __name__ == "__main__":
   absltest.main()

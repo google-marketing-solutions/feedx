@@ -1345,4 +1345,10 @@ def perform_treatment_assignment(
       item_id_column
   ].apply(coinflip)
 
+  validate_no_sample_ratio_mismatch(
+      experiment_items,
+      item_id_column=item_id_column,
+      treatment_assignment_column=treatment_assignment_column,
+  )
+
   return experiment_items
