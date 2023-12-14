@@ -365,10 +365,10 @@ def standardize_column_names_and_types(
   parse_functions = {
       "item_id": lambda x: x.astype(str),
       "date": pd.to_datetime,
-      "clicks": lambda x: pd.to_numeric(x).astype(int),
-      "impressions": lambda x: pd.to_numeric(x).astype(int),
+      "clicks": lambda x: pd.to_numeric(x).astype(float),
+      "impressions": lambda x: pd.to_numeric(x).astype(float),
       "total_cost": lambda x: pd.to_numeric(x).astype(float),
-      "conversions": lambda x: pd.to_numeric(x).astype(int),
+      "conversions": lambda x: pd.to_numeric(x).astype(float),
       "total_conversion_value": lambda x: pd.to_numeric(x).astype(float),
   }
   column_names = {

@@ -227,9 +227,9 @@ class StandardizeColumnNamesAndTypesTests(parameterized.TestCase):
             pd.to_datetime("2023-10-02"),
             pd.to_datetime("2023-10-03"),
         ],
-        "clicks": [1, 2, 3],
-        "impressions": [20, 21, 22],
-        "conversions": [2, 3, 5],
+        "clicks": [1.0, 2.0, 3.0],
+        "impressions": [20.0, 21.0, 22.0],
+        "conversions": [2.0, 3.0, 5.0],
         "total_conversion_value": [2.3, 4.2, 5.0],
         "total_cost": [1.0, 2.0, 3.0],
     })
@@ -1606,7 +1606,7 @@ class PrepareAndValidateHistoricalDataTests(parameterized.TestCase):
             ["2023-10-01", "2023-10-08", "2023-10-01", "2023-10-08"]
         ),
         "week_id": [0, 1, 0, 1],
-        "clicks": [1, 2, 3, 0],
+        "clicks": [1.0, 2.0, 3.0, 0.0],
     })
     pd.testing.assert_frame_equal(
         processed_data, expected_processed_data, check_like=True
@@ -1799,9 +1799,9 @@ class PrepareAndValidateExperimentDataTests(parameterized.TestCase):
         ),
         "time_period": ["test", "test", "test", "test"],
         "treatment_assignment": [0, 0, 1, 1],
-        "clicks": [1, 2, 3, 0],
-        "impressions": [20, 21, 22, 0],
-        "conversions": [2, 3, 5, 0],
+        "clicks": [1.0, 2.0, 3.0, 0.0],
+        "impressions": [20.0, 21.0, 22.0, 0.0],
+        "conversions": [2.0, 3.0, 5.0, 0.0],
         "total_conversion_value": [2.3, 4.2, 5.0, 0.0],
         "total_cost": [1.0, 2.0, 3.0, 0.0],
         "other_metric": [5.0, 2.0, 1.0, 0.0],
