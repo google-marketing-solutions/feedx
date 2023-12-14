@@ -77,7 +77,7 @@ def _sample_from_beta(
 def generate_synthetic_data(
     rng: np.random.Generator,
     n_items: int = 7000,
-    impressions_average: float = 100.0,
+    impressions_average: float = 50.0,
     impressions_standard_deviation: float = 100.0,
     ctr_average: float = 0.02,
     ctr_standard_deviation: float = 0.015,
