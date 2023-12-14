@@ -29,14 +29,6 @@ from scipy import stats
 
 from feedx import experiment_design
 
-GOOGLE_ADS_PERFORMANCE_CSV_COLUMNS = {
-    "date_column": "Week",
-    "item_id_column": "Item ID",
-    "impressions_column": "Impr.",
-    "clicks_column": "Clicks",
-}
-GOOGLE_ADS_PERFORMANCE_READ_CSV_ARGS = {"header": 2, "thousands": ","}
-
 
 def _sample_from_lognormal(
     rng: np.random.Generator,
