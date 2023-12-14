@@ -1364,6 +1364,54 @@ class ExperimentAnalysisTests(parameterized.TestCase):
 
     pd.testing.assert_frame_equal(results, expected_results, check_like=True)
 
+  def test_format_experiment_analysis_results_dataframe_returns_dataframe_styler(
+      self,
+  ):
+    metrics = [
+        experiment_analysis.Metric(name="Clicks", column="clicks"),
+        experiment_analysis.Metric(name="Impressions", column="impressions"),
+        experiment_analysis.Metric(
+            name="Clicks (no trimm)", column="clicks", allow_trimming=False
+        ),
+        experiment_analysis.Metric(
+            name="CTR", column="clicks", denominator_column="impressions"
+        ),
+        experiment_analysis.Metric(
+            name="CTR (no trim)",
+            column="clicks",
+            denominator_column="impressions",
+            allow_trimming=False,
+        ),
+    ]
+
+    results = experiment_analysis.analyze_experiment(
+        self.data,
+        metrics=metrics,
+        design=self.regular_design,
+        week_id_column="week_id",
+        item_id_column="item_id",
+        treatment_assignment_column="treatment_assignment",
+    )
+
+    formatted_results = (
+        experiment_analysis.format_experiment_analysis_results_dataframe(
+            results
+        )
+    )
+    shown_columns = formatted_results.columns[[
+        n
+        for n in range(len(formatted_results.columns))
+        if n not in formatted_results.hidden_columns
+    ]].values.tolist()
+    expected_columns = [
+        ("Relative Effect Size", "Point Estimate"),
+        ("Relative Effect Size", "95% CI"),
+        ("Absolute Effect Size (per item per week)", "Point Estimate"),
+        ("Absolute Effect Size (per item per week)", "95% CI"),
+        ("P-value", ""),
+    ]
+    self.assertListEqual(expected_columns, shown_columns)
+
 
 if __name__ == "__main__":
   absltest.main()
