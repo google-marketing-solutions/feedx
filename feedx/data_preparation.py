@@ -1020,6 +1020,7 @@ def validate_experiment_data(
     experiment_start_date: str,
     experiment_has_concluded: bool = True,
     can_be_negative_metric_columns: Collection[str] | None = None,
+    skip_coinflip_salt_validation: bool = False,
 ) -> None:
   """Runs all the required validation for the experiment data.
 
@@ -1061,6 +1062,9 @@ def validate_experiment_data(
       runtime)? Defaults to True.
     can_be_negative_metric_columns: The list of metric columns that are allowed
       to be negative. Defaults to None, meaning all metrics must be positive.
+    skip_coinflip_salt_validation: If true, the coinflip salt validation is not
+      performed. This is used if the splitting was not done with the design
+      notebook.
 
   Raises:
     ValueError: If any of the validations fail.
@@ -1119,9 +1123,10 @@ def validate_experiment_data(
   _validate_treatment_assignment_is_unique_for_each_item_id(
       experiment_data, item_id_column, treatment_assignment_column
   )
-  _validate_coinflip_matches_assignments(
-      experiment_data, design, treatment_assignment_column, item_id_column
-  )
+  if not skip_coinflip_salt_validation:
+    _validate_coinflip_matches_assignments(
+        experiment_data, design, treatment_assignment_column, item_id_column
+    )
   validate_no_sample_ratio_mismatch(
       experiment_data, item_id_column, treatment_assignment_column
   )
@@ -1280,6 +1285,7 @@ def prepare_and_validate_experiment_data(
     can_be_negative_metric_columns: list[str] | None = None,
     at_least_one_metrics: dict[str, str] | None = None,
     experiment_has_concluded: bool = True,
+    skip_coinflip_salt_validation: bool = False,
 ) -> pd.DataFrame:
   """Prepares and validates the experiment data for the experiment analysis.
 
@@ -1323,6 +1329,9 @@ def prepare_and_validate_experiment_data(
       "at_least_one_click"}. If not adding any at least one metrics, set to
       None. Defaults to None.
     experiment_has_concluded: Has the experiment finished? Defaults to True.
+    skip_coinflip_salt_validation: If true, the coinflip salt validation is not
+      performed. This is used if the splitting was not done with the design
+      notebook.
 
   Returns:
     The processed data.
@@ -1406,6 +1415,7 @@ def prepare_and_validate_experiment_data(
       metric_columns=metric_columns,
       can_be_negative_metric_columns=can_be_negative_metric_columns,
       experiment_has_concluded=experiment_has_concluded,
+      skip_coinflip_salt_validation=skip_coinflip_salt_validation,
   )
 
   return experiment_data

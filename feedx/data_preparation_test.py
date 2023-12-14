@@ -1229,6 +1229,39 @@ class ValidateExperimentDataTests(parameterized.TestCase):
       )
 
   @mock_experiment_design_validation
+  def test_coinflip_salt_not_checked_if_skip_coinflip_salt_validation_is_true(
+      self, mock_experiment_design
+  ):
+    experiment_data = pd.DataFrame({
+        "date": pd.to_datetime(
+            ["2023-10-01", "2023-10-01", "2023-10-08", "2023-10-08"]
+        ),
+        "week_id": [1, 1, 2, 2],
+        "item_id": ["1", "2", "1", "2"],
+        "clicks": [1, 2, 3, 4],
+        "impressions": [10, 12, 13, 14],
+        "treatment_assignment": [1, 0, 1, 0],  # Different to expected from salt
+    })
+    design = experiment_design.ExperimentDesign(
+        n_items_before_trimming=2,
+        runtime_weeks=2,
+        pretest_weeks=0,
+        **self.irrelevant_design_args
+    )
+
+    data_preparation.validate_experiment_data(
+        experiment_data,
+        design=design,
+        item_id_column="item_id",
+        date_column="date",
+        week_id_column="week_id",
+        metric_columns=["clicks", "impressions"],
+        experiment_start_date="2023-10-01",
+        treatment_assignment_column="treatment_assignment",
+        skip_coinflip_salt_validation=True,
+    )
+
+  @mock_experiment_design_validation
   def test_sample_ratio_mismatch_is_checked(self, mock_experiment_design):
     experiment_data = pd.DataFrame({
         "date": pd.to_datetime(
