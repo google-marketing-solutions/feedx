@@ -772,17 +772,26 @@ class YuensTTestPairedTest(parameterized.TestCase):
 
     self.sample_1 = np.array([1, 1, 2, 3, 5, 7, 8.5, 9.5, 12, 20])
     self.sample_2 = np.array([3, 6, 3, 2, 3, 4, 5.0, 0.2, 0.1, 0.5])
+    self.denom_sample_1 = np.array([5, 10, 10, 4, 50, 17, 18.5, 10, 14, 120])
+    self.denom_sample_2 = np.array(
+        [30, 16, 13, 24, 30, 43, 15.0, 1.2, 10.0, 5.0]
+    )
+
     self.delta_sample = self.sample_1 - self.sample_2
     self.quantile = 0.25
 
-    self.trimmed_sample_1 = statistics.TrimmedArray(
-        self.sample_1, self.quantile
-    )
-    self.trimmed_sample_2 = statistics.TrimmedArray(
-        self.sample_2, self.quantile
-    )
     self.trimmed_delta_sample = statistics.TrimmedArray(
         self.delta_sample, self.quantile
+    )
+    self.trimmed_stacked_samples = statistics.TrimmedArray(
+        np.stack([
+            self.delta_sample,
+            self.sample_1,
+            self.denom_sample_1,
+            self.sample_2,
+            self.denom_sample_2,
+        ]),
+        self.quantile,
     )
 
   def test_absolute_difference_is_absolute_difference_of_means(
@@ -792,9 +801,74 @@ class YuensTTestPairedTest(parameterized.TestCase):
         self.sample_1, self.sample_2, trimming_quantile=self.quantile
     )
 
-    self.assertEqual(
+    self.assertAlmostEqual(
         result.absolute_difference, self.trimmed_delta_sample.mean()
     )
+
+  def test_absolute_difference_for_ratio_is_absolute_difference_of_mean_ratios(
+      self,
+  ):
+    result = statistics.yuens_t_test_paired(
+        self.sample_1,
+        self.sample_2,
+        trimming_quantile=self.quantile,
+        denom_values1=self.denom_sample_1,
+        denom_values2=self.denom_sample_2,
+    )
+    expected_absolute_difference = (
+        self.trimmed_stacked_samples.mean()[1]
+        / self.trimmed_stacked_samples.mean()[2]
+        - self.trimmed_stacked_samples.mean()[3]
+        / self.trimmed_stacked_samples.mean()[4]
+    )
+    self.assertAlmostEqual(
+        result.absolute_difference, expected_absolute_difference
+    )
+
+  def test_relative_difference_for_ratio_is_relative_difference_of_mean_ratios(
+      self,
+  ):
+    result = statistics.yuens_t_test_paired(
+        self.sample_1,
+        self.sample_2,
+        trimming_quantile=self.quantile,
+        denom_values1=self.denom_sample_1,
+        denom_values2=self.denom_sample_2,
+    )
+    expected_relative_difference = (
+        self.trimmed_stacked_samples.mean()[1]
+        / self.trimmed_stacked_samples.mean()[2]
+        / (
+            self.trimmed_stacked_samples.mean()[3]
+            / self.trimmed_stacked_samples.mean()[4]
+        )
+        - 1.0
+    )
+    self.assertAlmostEqual(
+        result.relative_difference, expected_relative_difference
+    )
+
+  def test_yuens_t_test_paired_raises_exception_if_only_denom_values1_is_passed(
+      self,
+  ):
+    with self.assertRaises(ValueError):
+      statistics.yuens_t_test_paired(
+          self.sample_1,
+          self.sample_2,
+          denom_values1=self.denom_sample_1,
+          trimming_quantile=self.quantile,
+      )
+
+  def test_yuens_t_test_paired_raises_exception_if_only_denom_values2_is_passed(
+      self,
+  ):
+    with self.assertRaises(ValueError):
+      statistics.yuens_t_test_paired(
+          self.sample_1,
+          self.sample_2,
+          denom_values2=self.denom_sample_2,
+          trimming_quantile=self.quantile,
+      )
 
   def test_tandard_error_is_correct(self):
     result = statistics.yuens_t_test_paired(
@@ -975,24 +1049,28 @@ class YuensTTestPairedTest(parameterized.TestCase):
         result.absolute_difference_upper_bound, result.absolute_difference
     )
 
-  def test_alternative_greater_lower_bound_is_zero_when_p_value_equals_alpha(
-      self,
+  @parameterized.product(
+      is_ratio=[True, False], alternative=["two-sided", "greater"]
+  )
+  def test_lower_bound_is_zero_when_p_value_equals_alpha(
+      self, is_ratio, alternative
   ):
     """Tests for consistency between the confidence intervals and p_values."""
 
-    unadjusted_result = statistics.yuens_t_test_paired(
-        self.sample_1,
-        self.sample_2,
+    args = dict(
+        values1=self.sample_1,
+        values2=self.sample_2,
         trimming_quantile=self.quantile,
-        alternative="greater",
+        alternative=alternative,
     )
+    if is_ratio:
+      args["denom_values1"] = self.denom_sample_1
+      args["denom_values2"] = self.denom_sample_2
+
+    unadjusted_result = statistics.yuens_t_test_paired(**args)
 
     result = statistics.yuens_t_test_paired(
-        self.sample_1,
-        self.sample_2,
-        trimming_quantile=self.quantile,
-        alternative="greater",
-        alpha=unadjusted_result.p_value,
+        alpha=unadjusted_result.p_value, **args
     )
 
     actual = np.array([
@@ -1008,90 +1086,28 @@ class YuensTTestPairedTest(parameterized.TestCase):
 
     np.testing.assert_array_almost_equal(actual, expected)
 
+  @parameterized.product(
+      is_ratio=[True, False], alternative=["two-sided", "less"]
+  )
   def test_alternative_less_upper_bound_is_zero_when_p_value_equals_alpha(
-      self,
+      self, is_ratio, alternative
   ):
     """Tests for consistency between the confidence intervals and p_values."""
 
-    unadjusted_result = statistics.yuens_t_test_paired(
-        self.sample_2,
-        self.sample_1,
+    args = dict(
+        values1=self.sample_2,
+        values2=self.sample_1,
         trimming_quantile=self.quantile,
-        alternative="less",
+        alternative=alternative,
     )
+    if is_ratio:
+      args["denom_values1"] = self.denom_sample_2
+      args["denom_values2"] = self.denom_sample_1
+
+    unadjusted_result = statistics.yuens_t_test_paired(**args)
 
     result = statistics.yuens_t_test_paired(
-        self.sample_2,
-        self.sample_1,
-        trimming_quantile=self.quantile,
-        alternative="less",
-        alpha=unadjusted_result.p_value,
-    )
-
-    actual = np.array([
-        result.p_value,
-        result.absolute_difference_upper_bound,
-        result.relative_difference_upper_bound,
-    ])
-    expected = np.array([
-        result.alpha,
-        0.0,
-        0.0,
-    ])
-
-    np.testing.assert_array_almost_equal(actual, expected)
-
-  def test_alternative_two_sided_lower_bound_is_zero_when_p_value_equals_alpha(
-      self,
-  ):
-    """Tests for consistency between the confidence intervals and p_values."""
-
-    unadjusted_result = statistics.yuens_t_test_paired(
-        self.sample_1,
-        self.sample_2,
-        trimming_quantile=self.quantile,
-        alternative="two-sided",
-    )
-
-    result = statistics.yuens_t_test_paired(
-        self.sample_1,
-        self.sample_2,
-        trimming_quantile=self.quantile,
-        alternative="two-sided",
-        alpha=unadjusted_result.p_value,
-    )
-
-    actual = np.array([
-        result.p_value,
-        result.absolute_difference_lower_bound,
-        result.relative_difference_lower_bound,
-    ])
-    expected = np.array([
-        result.alpha,
-        0.0,
-        0.0,
-    ])
-
-    np.testing.assert_array_almost_equal(actual, expected)
-
-  def test_alternative_two_sided_upper_bound_is_zero_when_p_value_equals_alpha(
-      self,
-  ):
-    """Tests for consistency between the confidence intervals and p_values."""
-
-    unadjusted_result = statistics.yuens_t_test_paired(
-        self.sample_2,
-        self.sample_1,
-        trimming_quantile=self.quantile,
-        alternative="two-sided",
-    )
-
-    result = statistics.yuens_t_test_paired(
-        self.sample_2,
-        self.sample_1,
-        trimming_quantile=self.quantile,
-        alternative="two-sided",
-        alpha=unadjusted_result.p_value,
+        alpha=unadjusted_result.p_value, **args
     )
 
     actual = np.array([

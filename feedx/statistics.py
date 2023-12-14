@@ -716,11 +716,46 @@ def _ratio_mean_and_variance(
   return ratio_mean, ratio_var
 
 
+def _difference_of_ratios_mean_and_variance(
+    mean_vector: np.ndarray, cov: np.ndarray
+) -> tuple[float, float, float, float, float, float, float]:
+  """Calculates the mean and variance of the difference of two ratios."""
+
+  mean_1, var_1 = _ratio_mean_and_variance(
+      mean_1=mean_vector[0],
+      mean_2=mean_vector[1],
+      var_1=cov[0, 0],
+      var_2=cov[1, 1],
+      cov_12=cov[0, 1],
+  )
+  mean_2, var_2 = _ratio_mean_and_variance(
+      mean_1=mean_vector[2],
+      mean_2=mean_vector[3],
+      var_1=cov[2, 2],
+      var_2=cov[3, 3],
+      cov_12=cov[2, 3],
+  )
+  grad = np.array([
+      1.0 / mean_vector[1],
+      -mean_vector[0] / mean_vector[1] ** 2,
+      -1.0 / mean_vector[3],
+      mean_vector[2] / mean_vector[3] ** 2,
+  ])
+  difference_var = grad.T @ cov @ grad
+  difference_mean = mean_1 - mean_2
+
+  corr_12 = (var_1 + var_2 - difference_var) / (2 * np.sqrt(var_1 * var_2))
+
+  return difference_mean, difference_var, mean_1, mean_2, var_1, var_2, corr_12
+
+
 def yuens_t_test_paired(
     values1: np.ndarray,
     values2: np.ndarray,
     *,
     trimming_quantile: float,
+    denom_values1: np.ndarray | None = None,
+    denom_values2: np.ndarray | None = None,
     alternative: str = "two-sided",
     alpha: float = 0.05,
 ) -> StatisticalTestResults:
@@ -754,6 +789,12 @@ def yuens_t_test_paired(
     values1: The first sample of data for the test.
     values2: The second sample of data for the test.
     trimming_quantile: The quantile to trim from each side of the values arrays.
+    denom_values1: If analysing a ratio metric, then this should contain the
+      first sample of denominator values, and values1 will be used as the
+      numerator values. Defaults to None.
+    denom_values2: If analysing a ratio metric, then this should contain the
+      second sample of denominator values, and values2 will be used as the
+      numerator values. Defaults to None.
     alternative: The alternative hypothesis to test, one of ['two-sided',
       'greater', 'less']
     alpha: The false positive rate of the test, defaults to 0.05. If the p-value
@@ -768,37 +809,81 @@ def yuens_t_test_paired(
   if len(values1) != len(values2):
     raise ValueError("Values1 and values2 must have the same lengths.")
 
-  stacked_values = np.stack([
-      values1 - values2,
-      values1,
-      values2,
-  ])
-  trimmed_values = TrimmedArray(stacked_values, trimming_quantile)
-  trimmed_means = trimmed_values.mean()
-  trimmed_cov = trimmed_values.cov(ddof=1)
-  trimmed_standard_error = _one_sample_standard_error(
-      trimmed_values.std(ddof=1), len(trimmed_values)
-  )
-  sample_size = len(trimmed_values)
-  degrees_of_freedom = _one_sample_degrees_of_freedom(sample_size)
-  corr = trimmed_cov[1, 2] / np.sqrt(trimmed_cov[1, 1] * trimmed_cov[2, 2])
+  is_ratio_metric = False
+  if denom_values1 is not None and denom_values2 is not None:
+    is_ratio_metric = True
+  elif denom_values1 is not None or denom_values2 is not None:
+    raise ValueError(
+        "Must pass either both or neither denom_values1 and denom_values2."
+    )
+
+  if is_ratio_metric:
+    stacked_values = np.stack(
+        [values1 - values2, values1, denom_values1, values2, denom_values2]
+    )
+    trimmed_values = TrimmedArray(stacked_values, trimming_quantile)
+    trimmed_means = trimmed_values.mean()
+    trimmed_cov = trimmed_values.cov(ddof=1)
+
+    (
+        absolute_difference,
+        absolute_difference_var,
+        mean_1,
+        mean_2,
+        var_1,
+        var_2,
+        corr,
+    ) = _difference_of_ratios_mean_and_variance(
+        trimmed_means[1:], trimmed_cov[1:, 1:]
+    )
+
+    standard_error_1 = _one_sample_standard_error(
+        np.sqrt(var_1), len(trimmed_values)
+    )
+    standard_error_2 = _one_sample_standard_error(
+        np.sqrt(var_2), len(trimmed_values)
+    )
+    absolute_difference_standard_error = _one_sample_standard_error(
+        np.sqrt(absolute_difference_var), len(trimmed_values)
+    )
+    sample_size = len(trimmed_values)
+    degrees_of_freedom = _one_sample_degrees_of_freedom(sample_size)
+  else:
+    stacked_values = np.stack([
+        values1 - values2,
+        values1,
+        values2,
+    ])
+    trimmed_values = TrimmedArray(stacked_values, trimming_quantile)
+    trimmed_means = trimmed_values.mean()
+    trimmed_cov = trimmed_values.cov(ddof=1)
+    trimmed_standard_error = _one_sample_standard_error(
+        trimmed_values.std(ddof=1), len(trimmed_values)
+    )
+
+    _, mean_1, mean_2 = trimmed_means
+    _, standard_error_1, standard_error_2 = trimmed_standard_error
+    sample_size = len(trimmed_values)
+    degrees_of_freedom = _one_sample_degrees_of_freedom(sample_size)
+    corr = trimmed_cov[1, 2] / np.sqrt(trimmed_cov[1, 1] * trimmed_cov[2, 2])
+    absolute_difference_standard_error = trimmed_standard_error[0]
+    absolute_difference = trimmed_means[0]
 
   statistic, p_value = _ttest_from_stats(
-      point_estimate=trimmed_means[0],
-      standard_error=trimmed_standard_error[0],
+      point_estimate=absolute_difference,
+      standard_error=absolute_difference_standard_error,
       sample_size=sample_size,
       degrees_of_freedom=degrees_of_freedom,
       alternative=alternative,
   )
   is_significant = p_value < alpha
 
-  absolute_difference = trimmed_means[0]
   absolute_difference_lb, absolute_difference_ub = (
       _absolute_difference_confidence_interval(
-          mean_1=trimmed_means[1],
-          mean_2=trimmed_means[2],
-          standard_error_1=trimmed_standard_error[1],
-          standard_error_2=trimmed_standard_error[2],
+          mean_1=mean_1,
+          mean_2=mean_2,
+          standard_error_1=standard_error_1,
+          standard_error_2=standard_error_2,
           corr=corr,
           degrees_of_freedom=degrees_of_freedom,
           alpha=alpha,
@@ -808,14 +893,14 @@ def yuens_t_test_paired(
 
   # We only calculate the relative lift for metrics that are positive.
   # If not, it's hard to interpret it.
-  if (trimmed_means[1] >= 0.0) and (trimmed_means[2] >= 0.0):
-    relative_difference = trimmed_means[0] / trimmed_means[2]
+  if (mean_1 >= 0.0) and (mean_2 >= 0.0):
+    relative_difference = mean_1 / mean_2 - 1.0
     relative_difference_lb, relative_difference_ub = (
         _relative_difference_confidence_interval(
-            mean_1=trimmed_means[1],
-            mean_2=trimmed_means[2],
-            standard_error_1=trimmed_standard_error[1],
-            standard_error_2=trimmed_standard_error[2],
+            mean_1=mean_1,
+            mean_2=mean_2,
+            standard_error_1=standard_error_1,
+            standard_error_2=standard_error_2,
             corr=corr,
             degrees_of_freedom=degrees_of_freedom,
             alpha=alpha,
@@ -838,10 +923,10 @@ def yuens_t_test_paired(
       relative_difference=relative_difference,
       relative_difference_lower_bound=relative_difference_lb,
       relative_difference_upper_bound=relative_difference_ub,
-      standard_error=trimmed_standard_error[0],
+      standard_error=absolute_difference_standard_error,
       sample_size=sample_size,
       degrees_of_freedom=degrees_of_freedom,
-      control_average=trimmed_means[2],
+      control_average=mean_2,
   )
 
 
