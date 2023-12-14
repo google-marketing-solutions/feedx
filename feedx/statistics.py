@@ -704,6 +704,18 @@ def _two_sample_degrees_of_freedom(
     )
 
 
+def _ratio_mean_and_variance(
+    mean_1: float, mean_2: float, var_1: float, var_2: float, cov_12: float
+) -> tuple[float, float]:
+  """Calculates the mean and variance of the ratio of sample 1 and 2."""
+
+  ratio_mean = mean_1 / mean_2
+  ratio_var = ratio_mean**2 * (
+      var_1 / mean_1**2 + var_2 / mean_2**2 - 2 * cov_12 / (mean_1 * mean_2)
+  )
+  return ratio_mean, ratio_var
+
+
 def yuens_t_test_paired(
     values1: np.ndarray,
     values2: np.ndarray,
@@ -838,6 +850,8 @@ def yuens_t_test_ind(
     values2: np.ndarray,
     *,
     trimming_quantile: float,
+    denom_values1: np.ndarray | None = None,
+    denom_values2: np.ndarray | None = None,
     equal_var: bool = False,
     alternative: str = "two-sided",
     alpha: float = 0.05,
@@ -865,6 +879,20 @@ def yuens_t_test_ind(
     H0: mean(values1) - mean(values2) <= 0
     HA: mean(values1) - mean(values2) > 0
 
+  If denom_values1 and denom_values2 are specified, then the delta method
+  is used to compare two ratio metrics. In this case the null and alternative
+  hypotheses are changed to compare the ratios. For example, for the two-sample
+  alternative, the null and alternative hypotheses are:
+
+    H0: (
+        mean(values1) / mean(denom_values1)
+        - mean(values2) / mean(denom_values2)
+      ) = 0
+    HA: (
+        mean(values1) / mean(denom_values1)
+        - mean(values2) / mean(denom_values2)
+      ) =/= 0
+
   References:
     https://www.jstor.org/stable/40063824
 
@@ -872,6 +900,12 @@ def yuens_t_test_ind(
     values1: The first sample of data for the test.
     values2: The second sample of data for the test.
     trimming_quantile: The quantile to trim from each side of the values arrays.
+    denom_values1: If analysing a ratio metric, then this should contain the
+      first sample of denominator values, and values1 will be used as the
+      numerator values. Defaults to None.
+    denom_values2: If analysing a ratio metric, then this should contain the
+      second sample of denominator values, and values2 will be used as the
+      numerator values. Defaults to None.
     equal_var: Should the test assume both samples have equal variances?
     alternative: The alternative hypothesis to test, one of ['two-sided',
       'greater', 'less']
@@ -881,15 +915,50 @@ def yuens_t_test_ind(
   Returns:
     The statistical test results.
   """
-  trimmed_values1 = TrimmedArray(values1, trimming_quantile)
-  trimmed_values2 = TrimmedArray(values2, trimming_quantile)
+  is_ratio_metric = False
+  if denom_values1 is not None and denom_values2 is not None:
+    is_ratio_metric = True
+  elif denom_values1 is not None or denom_values2 is not None:
+    raise ValueError(
+        "Must pass either both or neither denom_values1 and denom_values2."
+    )
 
-  mean1 = trimmed_values1.mean()
-  mean2 = trimmed_values2.mean()
-  var1 = trimmed_values1.var(ddof=1)
-  var2 = trimmed_values2.var(ddof=1)
-  n1 = len(trimmed_values1)
-  n2 = len(trimmed_values2)
+  if is_ratio_metric:
+    stacked_values1 = np.stack([values1, denom_values1])
+    stacked_values2 = np.stack([values2, denom_values2])
+    trimmed_values1 = TrimmedArray(stacked_values1, trimming_quantile)
+    trimmed_values2 = TrimmedArray(stacked_values2, trimming_quantile)
+    trimmed_means_1 = trimmed_values1.mean()
+    trimmed_cov_matrix_1 = trimmed_values1.cov(ddof=1)
+    trimmed_means_2 = trimmed_values2.mean()
+    trimmed_cov_matrix_2 = trimmed_values2.cov(ddof=1)
+
+    mean1, var1 = _ratio_mean_and_variance(
+        mean_1=trimmed_means_1[0],
+        mean_2=trimmed_means_1[1],
+        var_1=trimmed_cov_matrix_1[0, 0],
+        var_2=trimmed_cov_matrix_1[1, 1],
+        cov_12=trimmed_cov_matrix_1[0, 1],
+    )
+    mean2, var2 = _ratio_mean_and_variance(
+        mean_1=trimmed_means_2[0],
+        mean_2=trimmed_means_2[1],
+        var_1=trimmed_cov_matrix_2[0, 0],
+        var_2=trimmed_cov_matrix_2[1, 1],
+        cov_12=trimmed_cov_matrix_2[0, 1],
+    )
+    n1 = len(trimmed_values1)
+    n2 = len(trimmed_values2)
+  else:
+    trimmed_values1 = TrimmedArray(values1, trimming_quantile)
+    trimmed_values2 = TrimmedArray(values2, trimming_quantile)
+
+    mean1 = trimmed_values1.mean()
+    mean2 = trimmed_values2.mean()
+    var1 = trimmed_values1.var(ddof=1)
+    var2 = trimmed_values2.var(ddof=1)
+    n1 = len(trimmed_values1)
+    n2 = len(trimmed_values2)
 
   standard_errors = _two_sample_standard_errors(
       standard_deviation_1=np.sqrt(var1),

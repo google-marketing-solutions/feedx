@@ -306,6 +306,11 @@ class YuensTTestIndTest(parameterized.TestCase):
 
     self.sample_1 = np.array([1, 1, 2, 3, 5, 7, 8.5, 9.5, 12, 20])
     self.sample_2 = np.array([3, 6, 3, 2, 3, 4, 5.0, 0.2, 0.1, 0.5, 1, 2, 1])
+    self.denom_sample_1 = np.array([5, 10, 10, 4, 50, 17, 18.5, 10, 14, 120])
+    self.denom_sample_2 = np.array(
+        [30, 16, 13, 24, 30, 43, 15.0, 1.2, 10.0, 5.0, 10, 12, 11]
+    )
+
     self.quantile = 0.25
 
     self.trimmed_sample_1 = statistics.TrimmedArray(
@@ -313,6 +318,13 @@ class YuensTTestIndTest(parameterized.TestCase):
     )
     self.trimmed_sample_2 = statistics.TrimmedArray(
         self.sample_2, self.quantile
+    )
+
+    self.trimmed_ratio_sample_1 = statistics.TrimmedArray(
+        np.stack([self.sample_1, self.denom_sample_1]), self.quantile
+    )
+    self.trimmed_ratio_sample_2 = statistics.TrimmedArray(
+        np.stack([self.sample_2, self.denom_sample_2]), self.quantile
     )
 
   def test_one_sample_standard_error_returns_expected_value(self):
@@ -432,10 +444,50 @@ class YuensTTestIndTest(parameterized.TestCase):
     expected_absolute_difference = (
         self.trimmed_sample_1.mean() - self.trimmed_sample_2.mean()
     )
-    print(expected_absolute_difference)
-    print(result.absolute_difference)
 
     self.assertEqual(result.absolute_difference, expected_absolute_difference)
+
+  def test_absolute_difference_for_ratio_is_difference_in_ratio_of_sample_means(
+      self,
+  ):
+    result = statistics.yuens_t_test_ind(
+        self.sample_1,
+        self.sample_2,
+        denom_values1=self.denom_sample_1,
+        denom_values2=self.denom_sample_2,
+        trimming_quantile=self.quantile,
+    )
+
+    expected_absolute_difference = (
+        self.trimmed_ratio_sample_1.mean()[0]
+        / self.trimmed_ratio_sample_1.mean()[1]
+        - self.trimmed_ratio_sample_2.mean()[0]
+        / self.trimmed_ratio_sample_2.mean()[1]
+    )
+
+    self.assertEqual(result.absolute_difference, expected_absolute_difference)
+
+  def test_yuens_t_test_ind_raises_exception_if_only_denom_values1_is_passed(
+      self,
+  ):
+    with self.assertRaises(ValueError):
+      statistics.yuens_t_test_ind(
+          self.sample_1,
+          self.sample_2,
+          denom_values1=self.denom_sample_1,
+          trimming_quantile=self.quantile,
+      )
+
+  def test_yuens_t_test_ind_raises_exception_if_only_denom_values2_is_passed(
+      self,
+  ):
+    with self.assertRaises(ValueError):
+      statistics.yuens_t_test_ind(
+          self.sample_1,
+          self.sample_2,
+          denom_values2=self.denom_sample_2,
+          trimming_quantile=self.quantile,
+      )
 
   def test_returns_expected_sample_size(self):
     result = statistics.yuens_t_test_ind(
@@ -611,96 +663,101 @@ class YuensTTestIndTest(parameterized.TestCase):
         result.absolute_difference_upper_bound, result.absolute_difference
     )
 
+  @parameterized.parameters([True, False])
   def test_alternative_greater_lower_bound_is_zero_when_p_value_equals_alpha(
-      self,
+      self, is_ratio
   ):
     """Tests for consistency between the confidence intervals and p_values."""
-
-    unadjusted_result = statistics.yuens_t_test_ind(
-        self.sample_1,
-        self.sample_2,
+    args = dict(
+        values1=self.sample_1,
+        values2=self.sample_2,
         trimming_quantile=self.quantile,
         alternative="greater",
     )
+    if is_ratio:
+      args["denom_values1"] = self.denom_sample_1
+      args["denom_values2"] = self.denom_sample_2
+
+    unadjusted_result = statistics.yuens_t_test_ind(**args)
 
     result = statistics.yuens_t_test_ind(
-        self.sample_1,
-        self.sample_2,
-        trimming_quantile=self.quantile,
-        alternative="greater",
-        alpha=unadjusted_result.p_value,
+        alpha=unadjusted_result.p_value, **args
     )
 
     self.assertAlmostEqual(result.p_value, result.alpha)
     self.assertAlmostEqual(result.absolute_difference_lower_bound, 0.0)
     self.assertAlmostEqual(result.relative_difference_lower_bound, 0.0)
 
+  @parameterized.parameters([True, False])
   def test_alternative_less_upper_bound_is_zero_when_p_value_equals_alpha(
-      self,
+      self, is_ratio
   ):
     """Tests for consistency between the confidence intervals and p_values."""
-
-    unadjusted_result = statistics.yuens_t_test_ind(
-        self.sample_2,
-        self.sample_1,
+    args = dict(
+        values1=self.sample_2,
+        values2=self.sample_1,
         trimming_quantile=self.quantile,
         alternative="less",
     )
+    if is_ratio:
+      args["denom_values1"] = self.denom_sample_2
+      args["denom_values2"] = self.denom_sample_1
+
+    unadjusted_result = statistics.yuens_t_test_ind(**args)
 
     result = statistics.yuens_t_test_ind(
-        self.sample_2,
-        self.sample_1,
-        trimming_quantile=self.quantile,
-        alternative="less",
-        alpha=unadjusted_result.p_value,
+        alpha=unadjusted_result.p_value, **args
     )
 
     self.assertAlmostEqual(result.p_value, result.alpha)
     self.assertAlmostEqual(result.absolute_difference_upper_bound, 0.0)
     self.assertAlmostEqual(result.relative_difference_upper_bound, 0.0)
 
+  @parameterized.parameters([True, False])
   def test_alternative_two_sided_lower_bound_is_zero_when_p_value_equals_alpha(
-      self,
+      self, is_ratio
   ):
     """Tests for consistency between the confidence intervals and p_values."""
-
-    unadjusted_result = statistics.yuens_t_test_ind(
-        self.sample_1,
-        self.sample_2,
+    args = dict(
+        values1=self.sample_1,
+        values2=self.sample_2,
         trimming_quantile=self.quantile,
         alternative="two-sided",
     )
+    if is_ratio:
+      args["denom_values1"] = self.denom_sample_1
+      args["denom_values2"] = self.denom_sample_2
+
+    unadjusted_result = statistics.yuens_t_test_ind(**args)
 
     result = statistics.yuens_t_test_ind(
-        self.sample_1,
-        self.sample_2,
-        trimming_quantile=self.quantile,
-        alternative="two-sided",
-        alpha=unadjusted_result.p_value,
+        alpha=unadjusted_result.p_value, **args
     )
 
     self.assertAlmostEqual(result.p_value, result.alpha)
     self.assertAlmostEqual(result.absolute_difference_lower_bound, 0.0)
     self.assertAlmostEqual(result.relative_difference_lower_bound, 0.0)
 
+  @parameterized.parameters([True, False])
   def test_alternative_two_sided_upper_bound_is_zero_when_p_value_equals_alpha(
-      self,
+      self, is_ratio
   ):
     """Tests for consistency between the confidence intervals and p_values."""
 
-    unadjusted_result = statistics.yuens_t_test_ind(
-        self.sample_2,
-        self.sample_1,
+    args = dict(
+        values1=self.sample_2,
+        values2=self.sample_1,
         trimming_quantile=self.quantile,
         alternative="two-sided",
     )
+    if is_ratio:
+      args["denom_values1"] = self.denom_sample_2
+      args["denom_values2"] = self.denom_sample_1
+
+    unadjusted_result = statistics.yuens_t_test_ind(**args)
 
     result = statistics.yuens_t_test_ind(
-        self.sample_2,
-        self.sample_1,
-        trimming_quantile=self.quantile,
-        alternative="two-sided",
-        alpha=unadjusted_result.p_value,
+        alpha=unadjusted_result.p_value, **args
     )
 
     self.assertAlmostEqual(result.p_value, result.alpha)
