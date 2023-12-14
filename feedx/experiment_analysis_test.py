@@ -1088,5 +1088,280 @@ class PivotTimeAssignmentTest(parameterized.TestCase):
     self.assertCountEqual(expected_index, actual_index)
 
 
+class ExperimentAnalysisTests(parameterized.TestCase):
+
+  def setUp(self):
+    super().setUp()
+
+    rng = np.random.default_rng(seed=1234)
+
+    self.data = pd.DataFrame({
+        "item_id": list(range(100)) * 5,
+        "week_id": [-1] * 100 + [0] * 100 + [1] * 100 + [2] * 100 + [3] * 100,
+        "clicks": rng.choice(10, size=500),
+        "impressions": rng.choice(100, size=500),
+    })
+    coinflip = experiment_design.Coinflip(salt="abc123")
+    self.data["treatment_assignment"] = self.data["item_id"].apply(coinflip)
+
+    self.crossover_design = experiment_design.ExperimentDesign(
+        n_items_before_trimming=100,
+        runtime_weeks=4,
+        primary_metric="clicks",
+        pretest_weeks=1,
+        is_crossover=True,
+        crossover_washout_weeks=1,
+        pre_trim_top_percentile=0.0,
+        pre_trim_bottom_percentile=0.0,
+        post_trim_percentile=0.05,
+        coinflip_salt="abc123",
+    )
+    self.regular_design = experiment_design.ExperimentDesign(
+        n_items_before_trimming=100,
+        runtime_weeks=4,
+        primary_metric="clicks",
+        pretest_weeks=1,
+        is_crossover=False,
+        pre_trim_top_percentile=0.0,
+        pre_trim_bottom_percentile=0.0,
+        post_trim_percentile=0.05,
+        coinflip_salt="abc123",
+    )
+
+  def test_analyze_experiment_returns_expected_dataframe_for_crossover(self):
+    metrics = [
+        experiment_analysis.Metric(name="Clicks", column="clicks"),
+        experiment_analysis.Metric(name="Impressions", column="impressions"),
+        experiment_analysis.Metric(
+            name="Clicks (no trimm)", column="clicks", allow_trimming=False
+        ),
+        experiment_analysis.Metric(
+            name="CTR", column="clicks", denominator_column="impressions"
+        ),
+        experiment_analysis.Metric(
+            name="CTR (no trim)",
+            column="clicks",
+            denominator_column="impressions",
+            allow_trimming=False,
+        ),
+    ]
+
+    results = experiment_analysis.analyze_experiment(
+        self.data,
+        metrics=metrics,
+        design=self.crossover_design,
+        week_id_column="week_id",
+        item_id_column="item_id",
+        treatment_assignment_column="treatment_assignment",
+    )
+
+    expected_results = pd.DataFrame({
+        "metric": [
+            "Clicks",
+            "Impressions",
+            "Clicks (no trimm)",
+            "CTR",
+            "CTR (no trim)",
+        ],
+        "is_significant": [False] * 5,
+        "alpha": [0.05] * 5,
+        "p_value": [
+            0.47832378754376703,
+            0.631473531978914,
+            0.4342870505283397,
+            0.33781355925252377,
+            0.34671790805522984,
+        ],
+        "statistic": [
+            -0.7120052883327112,
+            0.4813155592347688,
+            -0.7850703319578739,
+            -0.9636879444525706,
+            -0.9454758316151358,
+        ],
+        "absolute_difference": [
+            -0.3455555555555555,
+            1.9257777777777787,
+            -0.3508000000000001,
+            -0.012357918808163657,
+            -0.01046454347665346,
+        ],
+        "absolute_difference_lower_bound": [
+            -1.3098904272065506,
+            -6.024265288055011,
+            -1.2374254120867663,
+            -0.03783807717453217,
+            -0.032425892314840936,
+        ],
+        "absolute_difference_upper_bound": [
+            0.6187793160954469,
+            9.875820843610532,
+            0.5358254120867707,
+            0.013122239558204858,
+            0.011496805361534017,
+        ],
+        "relative_difference": [
+            -0.07548287194124403,
+            0.039128711154617246,
+            -0.07626086956521705,
+            -0.1316491747495938,
+            -0.11135639199612779,
+        ],
+        "relative_difference_lower_bound": [
+            -0.2593046070918117,
+            -0.11450751537796222,
+            -0.2449530881288059,
+            -0.3476976214717571,
+            -0.30461303788372396,
+        ],
+        "relative_difference_upper_bound": [
+            0.15217961614465603,
+            0.21767934579873627,
+            0.13013226417039925,
+            0.16947559889323638,
+            0.14331357952247625,
+        ],
+        "standard_error": [
+            0.4853272317186522,
+            4.001071107777033,
+            0.4468389464229858,
+            0.012823568956425677,
+            0.011068017951106278,
+        ],
+        "sample_size": [90, 90, 100, 90, 100],
+        "degrees_of_freedom": [89, 89, 99, 89, 99],
+        "control_average": [
+            4.577933333333327,
+            49.216488888888925,
+            4.599999999999994,
+            0.09387008184190522,
+            0.09397344228804883,
+        ],
+    }).set_index("metric")
+
+    pd.testing.assert_frame_equal(results, expected_results, check_like=True)
+
+  def test_analyze_experiment_returns_expected_dataframe_for_regular_experiment(
+      self,
+  ):
+    metrics = [
+        experiment_analysis.Metric(name="Clicks", column="clicks"),
+        experiment_analysis.Metric(name="Impressions", column="impressions"),
+        experiment_analysis.Metric(
+            name="Clicks (no trimm)", column="clicks", allow_trimming=False
+        ),
+        experiment_analysis.Metric(
+            name="CTR", column="clicks", denominator_column="impressions"
+        ),
+        experiment_analysis.Metric(
+            name="CTR (no trim)",
+            column="clicks",
+            denominator_column="impressions",
+            allow_trimming=False,
+        ),
+    ]
+
+    results = experiment_analysis.analyze_experiment(
+        self.data,
+        metrics=metrics,
+        design=self.regular_design,
+        week_id_column="week_id",
+        item_id_column="item_id",
+        treatment_assignment_column="treatment_assignment",
+    )
+
+    expected_results = pd.DataFrame({
+        "metric": [
+            "Clicks",
+            "Impressions",
+            "Clicks (no trimm)",
+            "CTR",
+            "CTR (no trim)",
+        ],
+        "is_significant": [False] * 5,
+        "alpha": [0.05] * 5,
+        "p_value": [
+            0.5004139975492669,
+            0.05707936249907935,
+            0.5900129415610891,
+            0.1432090186745279,
+            0.12240988458432771,
+        ],
+        "statistic": [
+            0.6766612168597068,
+            -1.9279922021840314,
+            0.5406746796234402,
+            1.4771852488068573,
+            1.5599513498192001,
+        ],
+        "absolute_difference": [
+            0.18169467836582065,
+            -5.54169717070824,
+            0.1473638697710875,
+            0.011500659455663406,
+            0.012378193879969746,
+        ],
+        "absolute_difference_lower_bound": [
+            -0.35200221156510725,
+            -11.25379932791624,
+            -0.393813755814439,
+            -0.0039722230079432316,
+            -0.003393947268635872,
+        ],
+        "absolute_difference_upper_bound": [
+            0.7153915682967485,
+            0.17040498649976232,
+            0.688541495356614,
+            0.026973541919270046,
+            0.028150335028575363,
+        ],
+        "relative_difference": [
+            0.0409347798602373,
+            -0.10609826756026874,
+            0.033436977627427034,
+            0.13390359386720174,
+            0.1463765675896762,
+        ],
+        "relative_difference_lower_bound": [
+            -0.07528562935721528,
+            -0.20552673572896996,
+            -0.08492448006399,
+            -0.042724072352300246,
+            -0.03762604639401568,
+        ],
+        "relative_difference_upper_bound": [
+            0.17089717970750828,
+            0.003439481543815903,
+            0.1654716806256349,
+            0.34515897457513267,
+            0.3596088110373934,
+        ],
+        "standard_error": [
+            0.26851646560895137,
+            2.874335883947352,
+            0.27255552243304787,
+            0.007785522814388138,
+            0.007934987127261622,
+        ],
+        "sample_size": [92, 92, 100, 92, 100],
+        "degrees_of_freedom": [
+            87.10024618211024,
+            88.04026722874927,
+            93.83711686034405,
+            87.6780449943031,
+            86.80677126875106,
+        ],
+        "control_average": [
+            4.438638218800158,
+            52.23174042460492,
+            4.4072126199053,
+            0.08588760856612362,
+            0.08456403974896019,
+        ],
+    }).set_index("metric")
+
+    pd.testing.assert_frame_equal(results, expected_results, check_like=True)
+
+
 if __name__ == "__main__":
   absltest.main()

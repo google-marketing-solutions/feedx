@@ -13,9 +13,12 @@
 # limitations under the License.
 
 """Module containing functions for analyzing experiment results."""
+from collections.abc import Collection
+import dataclasses
 
 import numpy as np
 import pandas as pd
+import tqdm.autonotebook as tqdm
 
 from feedx import experiment_design
 from feedx import statistics
@@ -726,3 +729,88 @@ def analyze_single_metric(
         post_trim_percentile=post_trim_percentile,
         treatment_assignment_column=treatment_assignment_index_name,
     )
+
+
+@dataclasses.dataclass
+class Metric:
+  """A metric to be analyzed.
+
+  Attributes:
+    name: The human readable name of the metric.
+    column: The column name in the data containing the metric.
+    denominator_column: If the metric is a ratio (e.g. CTR) then this is the
+      column name containing the denominator of the metric, and the column
+      attribute contains the numerator. Defaults to None.
+    allow_trimming: True if trimming should be applied, given it is included in
+      the experiment design. Set to False for metrics that should not need
+      trimming, for example binomial metrics. Defaults to True.
+  """
+
+  name: str
+  column: str
+  denominator_column: str | None = None
+  allow_trimming: bool = True
+
+
+def analyze_experiment(
+    data: pd.DataFrame,
+    *,
+    metrics: Collection[Metric],
+    design: ExperimentDesign,
+    week_id_column: str = "week_id",
+    item_id_column: str = "item_id",
+    treatment_assignment_column: str = "treatment_assignment",
+) -> pd.DataFrame:
+  """Analyze many metrics in an experiment.
+
+  This iterates through all the metrics and runs the analysis as specified in
+  the design.
+
+  Args:
+    data: The experiment data to be analyzed.
+    metrics: The metrics to be analyzed.
+    design: The design of the experiment.
+    week_id_column: The name of the column in the data containing the week id.
+    item_id_column: The name of the column in the data containing the item id.
+    treatment_assignment_column: The name of the column in the data containing
+      the treatment assignment of the item.
+
+  Returns:
+    A dataframe with one row per metric, containing the results of the analysis.
+  """
+  numerator_columns = [metric.column for metric in metrics]
+  denominator_columns = [
+      metric.denominator_column
+      for metric in metrics
+      if metric.denominator_column is not None
+  ]
+  metric_columns = list(set(numerator_columns + denominator_columns))
+
+  pivoted_data = pivot_time_assignment(
+      data,
+      design=design,
+      start_week_id=0,
+      metric_columns=metric_columns,
+      item_id_column=item_id_column,
+      week_id_column=week_id_column,
+      treatment_column=treatment_assignment_column,
+  )
+
+  results_list = []
+  for metric in tqdm.tqdm(metrics):
+    result = analyze_single_metric(
+        pivoted_data,
+        design=design,
+        metric_name=metric.column,
+        denominator_metric_name=metric.denominator_column,
+        treatment_assignment_index_name=treatment_assignment_column,
+        apply_trimming_if_in_design=metric.allow_trimming,
+    )
+    result_dict = dataclasses.asdict(result)
+    result_dict["metric"] = metric.name
+    results_list.append(result_dict)
+
+  experiment_results = pd.DataFrame.from_records(results_list).set_index(
+      "metric"
+  )
+  return experiment_results
