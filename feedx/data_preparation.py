@@ -268,6 +268,9 @@ def add_relative_effects_to_synthetic_data_for_demo(
       total_conversion_value, defaults to 0.2.
     total_cost_relative_effect: The relative effect to apply to the total_cost,
       defaults to 0.2.
+
+  Returns:
+    The data with the synthetic effects added during the treatment periods.
   """
   synthetic_data = synthetic_data.copy()
   is_crossover = "test_1" in synthetic_data[time_period_column].values
