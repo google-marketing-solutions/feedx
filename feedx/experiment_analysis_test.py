@@ -52,7 +52,7 @@ class GetWeeksBetweenTest(parameterized.TestCase):
     self.assertListEqual(actual_result.values.tolist(), expected_result)
 
 
-class ExperimentAnalysisTest(parameterized.TestCase):
+class AnalyzeSingleMetricTests(parameterized.TestCase):
 
   def setUp(self):
     super().setUp()
@@ -80,10 +80,47 @@ class ExperimentAnalysisTest(parameterized.TestCase):
         **self.irrelevant_design_args
     )
 
-    analysis_result = experiment_analysis.analyze_experiment(
+    analysis_result = experiment_analysis.analyze_single_metric(
         data,
         design=design,
         metric_name="clicks",
+    )
+
+    self.assertIsInstance(analysis_result, StatisticalTestResults)
+
+  def test_analyze_regular_experiment_ratio_metric_returns_analysis_results(
+      self,
+  ):
+    data = pd.DataFrame({
+        "treatment_assignment": [0] * 5 + [1] * 5,
+        "test": np.linspace(0, 1, 10),
+        "pretest": np.ones(10),
+    }).set_index(["treatment_assignment"])
+    data.columns = pd.MultiIndex.from_product([["clicks"], data.columns])
+
+    denominator_data = pd.DataFrame({
+        "treatment_assignment": [0] * 5 + [1] * 5,
+        "test": np.linspace(10, 20, 10),
+        "pretest": 10 * np.ones(10),
+    }).set_index(["treatment_assignment"])
+    denominator_data.columns = pd.MultiIndex.from_product(
+        [["impressions"], denominator_data.columns]
+    )
+
+    data = pd.concat([data, denominator_data], axis=1)
+
+    design = experiment_design.ExperimentDesign(
+        is_crossover=False,
+        post_trim_percentile=0.1,
+        pretest_weeks=4,
+        **self.irrelevant_design_args
+    )
+
+    analysis_result = experiment_analysis.analyze_single_metric(
+        data,
+        design=design,
+        metric_name="clicks",
+        denominator_metric_name="impressions",
     )
 
     self.assertIsInstance(analysis_result, StatisticalTestResults)
@@ -107,7 +144,7 @@ class ExperimentAnalysisTest(parameterized.TestCase):
         "google3.third_party.professional_services.solutions.feedx.feedx.statistics.apply_cuped_adjustment",
         side_effect=lambda x, *y: x,
     ) as mock_apply_cuped_adjustment:
-      experiment_analysis.analyze_experiment(
+      experiment_analysis.analyze_single_metric(
           data,
           design=design,
           metric_name="clicks",
@@ -133,7 +170,7 @@ class ExperimentAnalysisTest(parameterized.TestCase):
     with mock.patch(
         "google3.third_party.professional_services.solutions.feedx.feedx.statistics.apply_cuped_adjustment"
     ) as mock_apply_cuped_adjustment:
-      experiment_analysis.analyze_experiment(
+      experiment_analysis.analyze_single_metric(
           data,
           design=design,
           metric_name="clicks",
@@ -155,10 +192,47 @@ class ExperimentAnalysisTest(parameterized.TestCase):
         **self.irrelevant_design_args
     )
 
-    analysis_result = experiment_analysis.analyze_experiment(
+    analysis_result = experiment_analysis.analyze_single_metric(
         data,
         design=design,
         metric_name="clicks",
+    )
+
+    self.assertIsInstance(analysis_result, StatisticalTestResults)
+
+  def test_analyze_crossover_experiment_ratio_metric_returns_analysis_results(
+      self,
+  ):
+    data = pd.DataFrame({
+        "treatment_assignment": [0] * 5 + [1] * 5,
+        "test_1": np.linspace(0, 1, 10),
+        "test_2": np.linspace(0.5, 1.5, 10),
+    }).set_index(["treatment_assignment"])
+    data.columns = pd.MultiIndex.from_product([["clicks"], data.columns])
+
+    denominator_data = pd.DataFrame({
+        "treatment_assignment": [0] * 5 + [1] * 5,
+        "test_1": np.linspace(10, 20, 10),
+        "test_2": np.linspace(15, 25, 10),
+    }).set_index(["treatment_assignment"])
+    denominator_data.columns = pd.MultiIndex.from_product(
+        [["impressions"], denominator_data.columns]
+    )
+
+    data = pd.concat([data, denominator_data], axis=1)
+
+    design = experiment_design.ExperimentDesign(
+        is_crossover=True,
+        post_trim_percentile=0.1,
+        pretest_weeks=4,
+        **self.irrelevant_design_args
+    )
+
+    analysis_result = experiment_analysis.analyze_single_metric(
+        data,
+        design=design,
+        metric_name="clicks",
+        denominator_metric_name="impressions",
     )
 
     self.assertIsInstance(analysis_result, StatisticalTestResults)
@@ -180,7 +254,7 @@ class ExperimentAnalysisTest(parameterized.TestCase):
         **self.irrelevant_design_args
     )
 
-    analysis_result = experiment_analysis.analyze_experiment(
+    analysis_result = experiment_analysis.analyze_single_metric(
         data,
         design=design,
         metric_name="clicks",
@@ -214,7 +288,7 @@ class ExperimentAnalysisTest(parameterized.TestCase):
         **self.irrelevant_design_args
     )
 
-    analysis_result = experiment_analysis.analyze_experiment(
+    analysis_result = experiment_analysis.analyze_single_metric(
         data,
         design=design,
         metric_name="clicks",
@@ -247,7 +321,7 @@ class ExperimentAnalysisTest(parameterized.TestCase):
     )
 
     with self.assertRaises(ValueError):
-      experiment_analysis.analyze_experiment(
+      experiment_analysis.analyze_single_metric(
           data,
           design=design,
           metric_name="clicks",
@@ -274,7 +348,7 @@ class ExperimentAnalysisTest(parameterized.TestCase):
     )
 
     with self.assertRaises(ValueError):
-      experiment_analysis.analyze_experiment(
+      experiment_analysis.analyze_single_metric(
           data,
           design=design,
           metric_name="clicks",
@@ -301,7 +375,7 @@ class ExperimentAnalysisTest(parameterized.TestCase):
     )
 
     with self.assertRaises(ValueError):
-      experiment_analysis.analyze_experiment(
+      experiment_analysis.analyze_single_metric(
           data,
           design=design,
           metric_name="clicks",
@@ -321,7 +395,7 @@ class ExperimentAnalysisTest(parameterized.TestCase):
         **self.irrelevant_design_args
     )
 
-    analysis_results = experiment_analysis.analyze_experiment(
+    analysis_results = experiment_analysis.analyze_single_metric(
         data,
         design=design,
         metric_name="clicks",
@@ -330,7 +404,7 @@ class ExperimentAnalysisTest(parameterized.TestCase):
     self.assertIsInstance(analysis_results, StatisticalTestResults)
 
   @parameterized.parameters(False, True)
-  def test_analyze_experiment_does_not_mutate_original_dataframe(
+  def test_analyze_single_metric_does_not_mutate_original_dataframe(
       self, is_crossover
   ):
     data = pd.DataFrame({
@@ -351,7 +425,7 @@ class ExperimentAnalysisTest(parameterized.TestCase):
         **self.irrelevant_design_args
     )
 
-    experiment_analysis.analyze_experiment(
+    experiment_analysis.analyze_single_metric(
         data,
         design=design,
         metric_name="clicks",
@@ -360,7 +434,7 @@ class ExperimentAnalysisTest(parameterized.TestCase):
     pd.testing.assert_frame_equal(data, original_data_copy)
 
   @parameterized.parameters(False, True)
-  def test_analyze_experiment_does_not_use_trimming_if_apply_trimming_if_in_design_is_false(
+  def test_analyze_single_metric_does_not_use_trimming_if_apply_trimming_if_in_design_is_false(
       self, is_crossover
   ):
     data = pd.DataFrame({
@@ -382,7 +456,7 @@ class ExperimentAnalysisTest(parameterized.TestCase):
         "google3.third_party.professional_services.solutions.feedx.feedx.statistics.TrimmedArray",
         side_effect=statistics.TrimmedArray,
     ) as mock_trimmed_array:
-      experiment_analysis.analyze_experiment(
+      experiment_analysis.analyze_single_metric(
           data,
           design=design,
           metric_name="clicks",

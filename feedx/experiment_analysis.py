@@ -14,6 +14,7 @@
 
 """Module containing functions for analyzing experiment results."""
 
+import numpy as np
 import pandas as pd
 
 from feedx import experiment_design
@@ -451,9 +452,28 @@ def pivot_time_assignment(
     )
 
 
-def _analyze_regular_experiment(
+def _prepare_metrics_for_regular_experiment(
+    data: pd.DataFrame,
+    treatment_assignment_column: str,
+    post_trim_percentile: float,
+) -> tuple[np.ndarray, np.ndarray]:
+  """Splits the metric into control and treatment and applies cuped."""
+  if "pretest" in data.columns:
+    y = statistics.apply_cuped_adjustment(
+        data["test"].values, data["pretest"].values, post_trim_percentile
+    )
+  else:
+    y = data["test"].values
+
+  y_control = y[data[treatment_assignment_column].values == 0]
+  y_treatment = y[data[treatment_assignment_column].values == 1]
+  return y_treatment, y_control
+
+
+def _analyze_regular_experiment_single_metric(
     data: pd.DataFrame,
     *,
+    denominator_data: pd.DataFrame | None,
     post_trim_percentile: float,
     treatment_assignment_column: str,
 ) -> statistics.StatisticalTestResults:
@@ -470,6 +490,8 @@ def _analyze_regular_experiment(
       flags whether the sample is in the control group (0) or treatment group
       (1). If it exists, the "pretest" column should contain the value of the
       metric for that sample from the period before the experiment began.
+    denominator_data: Same as data, but for the denominator metric if analysing
+      a ratio.
     post_trim_percentile: The fraction of smallest and largest samples to trim
       from the metric in the analysis.
     treatment_assignment_column: The column containin the treatment assignment
@@ -478,52 +500,36 @@ def _analyze_regular_experiment(
   Returns:
     The statistical test results.
   """
-  if "pretest" in data.columns:
-    y = statistics.apply_cuped_adjustment(
-        data["test"].values, data["pretest"].values, post_trim_percentile
+  y_treatment, y_control = _prepare_metrics_for_regular_experiment(
+      data, treatment_assignment_column, post_trim_percentile
+  )
+
+  if denominator_data is not None:
+    denominator_y_treatment, denominator_y_control = (
+        _prepare_metrics_for_regular_experiment(
+            denominator_data, treatment_assignment_column, post_trim_percentile
+        )
     )
   else:
-    y = data["test"].values
-
-  y_0 = y[data[treatment_assignment_column].values == 0]
-  y_1 = y[data[treatment_assignment_column].values == 1]
+    denominator_y_control = None
+    denominator_y_treatment = None
 
   return statistics.yuens_t_test_ind(
-      y_1,
-      y_0,
+      y_treatment,
+      y_control,
       trimming_quantile=post_trim_percentile,
+      denom_values1=denominator_y_treatment,
+      denom_values2=denominator_y_control,
       equal_var=False,
       alternative="two-sided",
   )
 
 
-def _analyze_crossover_experiment(
+def _prepare_metrics_for_crossover_experiment(
     data: pd.DataFrame,
-    *,
-    post_trim_percentile: float,
     treatment_assignment_column: str,
-) -> statistics.StatisticalTestResults:
-  """Analyzes a crossover A/B test.
-
-  This applies Yuen's t-test to the dataset provided.
-
-  Args:
-    data: The dataset to be analyzed. Must contain the columns "test_1",
-      "test_2" and "treatment", and each row must correspond to a different
-      randomisation unit. The "test_1" column contains the value of the metric
-      for that sample from the first period of the crossover test, and the
-      "test_2" column contains the value of the metric from the second period of
-      the crossover test. The "treatment" column is either 1 or 0 and flags
-      whether the sample was treated in the first period (1) or in the second
-      period (0).
-    post_trim_percentile: The fraction of smallest and largest samples to trim
-      from the metric in the analysis.
-    treatment_assignment_column: The column containin the treatment assignment
-      in the data.
-
-  Returns:
-    The statistical test results.
-  """
+) -> tuple[np.ndarray, np.ndarray]:
+  """Demeans the data and aligns the treatment and control time periods."""
   y_1 = data["test_1"].values
   y_2 = data["test_2"].values
   is_treated_first = data[treatment_assignment_column].values == 1
@@ -556,19 +562,72 @@ def _analyze_crossover_experiment(
   y_control_demeaned += adjustment_factor
   y_treatment_demeaned += adjustment_factor
 
+  return y_treatment_demeaned, y_control_demeaned
+
+
+def _analyze_crossover_experiment_single_metric(
+    data: pd.DataFrame,
+    *,
+    denominator_data: pd.DataFrame | None,
+    post_trim_percentile: float,
+    treatment_assignment_column: str,
+) -> statistics.StatisticalTestResults:
+  """Analyzes a crossover A/B test.
+
+  This applies Yuen's t-test to the dataset provided.
+
+  Args:
+    data: The dataset to be analyzed. Must contain the columns "test_1",
+      "test_2" and "treatment", and each row must correspond to a different
+      randomisation unit. The "test_1" column contains the value of the metric
+      for that sample from the first period of the crossover test, and the
+      "test_2" column contains the value of the metric from the second period of
+      the crossover test. The "treatment" column is either 1 or 0 and flags
+      whether the sample was treated in the first period (1) or in the second
+      period (0).
+    denominator_data: Same as data, but for the denominator metric if analysing
+      a ratio.
+    post_trim_percentile: The fraction of smallest and largest samples to trim
+      from the metric in the analysis.
+    treatment_assignment_column: The column containin the treatment assignment
+      in the data.
+
+  Returns:
+    The statistical test results.
+  """
+
+  y_treatment_demeaned, y_control_demeaned = (
+      _prepare_metrics_for_crossover_experiment(
+          data, treatment_assignment_column
+      )
+  )
+
+  if denominator_data is not None:
+    denominator_y_treatment_demeaned, denominator_y_control_demeaned = (
+        _prepare_metrics_for_crossover_experiment(
+            denominator_data, treatment_assignment_column
+        )
+    )
+  else:
+    denominator_y_treatment_demeaned = None
+    denominator_y_control_demeaned = None
+
   return statistics.yuens_t_test_paired(
       y_treatment_demeaned,
       y_control_demeaned,
       trimming_quantile=post_trim_percentile,
+      denom_values1=denominator_y_treatment_demeaned,
+      denom_values2=denominator_y_control_demeaned,
       alternative="two-sided",
   )
 
 
-def analyze_experiment(
+def analyze_single_metric(
     data: pd.DataFrame,
     *,
     design: ExperimentDesign,
     metric_name: str,
+    denominator_metric_name: str | None = None,
     treatment_assignment_index_name: str = "treatment_assignment",
     apply_trimming_if_in_design: bool = True,
 ) -> statistics.StatisticalTestResults:
@@ -594,6 +653,10 @@ def analyze_experiment(
   value of the metric for that sample from the period before the experiment
   began.
 
+  If you specify a denominator_metric_name, then the analysis will be done for a
+  ratio metric, where metric_name is the numerator and denominator_metric_name
+  is the denominator.
+
   Args:
     data: The dataset to be analyzed. This should have been generated with
       pivot_time_assignment(), so it will have a two level index containing the
@@ -603,6 +666,9 @@ def analyze_experiment(
       trim percentile and whether the it is a crossover test or not.
     metric_name: The name of the metric to be analyzed. This should exist as the
       top level
+    denominator_metric_name: The name of the metric that is the denominator if a
+      ratio is to be analyzed. Defaults to None, meaning the analysis is for a
+      regular, non-ratio metric.
     treatment_assignment_index_name: The name of the index level containing the
       treatment assignment in the data. Defaults to "treatment_assignment".
     apply_trimming_if_in_design: Whether to apply the trimming if it is
@@ -616,6 +682,10 @@ def analyze_experiment(
       on the design).
   """
   data_metric_subset = data[metric_name].reset_index()
+  if denominator_metric_name is not None:
+    denominator_metric_subset = data[denominator_metric_name].reset_index()
+  else:
+    denominator_metric_subset = None
 
   required_columns = {treatment_assignment_index_name}
   if design.is_crossover:
@@ -626,6 +696,11 @@ def analyze_experiment(
       required_columns.add("pretest")
 
   missing_columns = required_columns - set(data_metric_subset.columns)
+  if denominator_metric_name is not None:
+    missing_columns.update(
+        required_columns - set(denominator_metric_subset.columns)
+    )
+
   if missing_columns:
     raise ValueError(
         "The dataframe is missing the following required columns: "
@@ -638,14 +713,16 @@ def analyze_experiment(
     post_trim_percentile = 0.0
 
   if design.is_crossover:
-    return _analyze_crossover_experiment(
+    return _analyze_crossover_experiment_single_metric(
         data_metric_subset,
+        denominator_data=denominator_metric_subset,
         post_trim_percentile=post_trim_percentile,
         treatment_assignment_column=treatment_assignment_index_name,
     )
   else:
-    return _analyze_regular_experiment(
+    return _analyze_regular_experiment_single_metric(
         data_metric_subset,
+        denominator_data=denominator_metric_subset,
         post_trim_percentile=post_trim_percentile,
         treatment_assignment_column=treatment_assignment_index_name,
     )

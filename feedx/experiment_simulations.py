@@ -854,7 +854,7 @@ class SimulationAnalysis:
       )
 
       aa_simulation_results_list.append(
-          experiment_analysis.analyze_experiment(
+          experiment_analysis.analyze_single_metric(
               simulated_aa_test_data,
               design=self.design,
               metric_name=self.design.primary_metric,
@@ -871,7 +871,7 @@ class SimulationAnalysis:
       )
 
       ab_simulation_results_list.append(
-          experiment_analysis.analyze_experiment(
+          experiment_analysis.analyze_single_metric(
               simulated_ab_test_data,
               design=self.design,
               metric_name=self.design.primary_metric,
