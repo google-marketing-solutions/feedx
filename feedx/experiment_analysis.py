@@ -529,8 +529,7 @@ def _analyze_regular_experiment_single_metric(
 
 
 def _prepare_metrics_for_crossover_experiment(
-    data: pd.DataFrame,
-    treatment_assignment_column: str,
+    data: pd.DataFrame, treatment_assignment_column: str, apply_demean: bool
 ) -> tuple[np.ndarray, np.ndarray]:
   """Demeans the data and aligns the treatment and control time periods."""
   y_1 = data["test_1"].values
@@ -542,8 +541,11 @@ def _prepare_metrics_for_crossover_experiment(
   # control mean, not to 0.0. Therefore I will first set the means to 0,
   # then calculate treatment and control, and then adjust the means again
   # so that the control mean matches the original control mean.
-  y_1_demeaned = y_1 - y_1.mean()
-  y_2_demeaned = y_2 - y_2.mean()
+  y_1_demeaned = y_1.copy()
+  y_2_demeaned = y_2.copy()
+  if apply_demean:
+    y_1_demeaned -= y_1.mean()
+    y_2_demeaned -= y_2.mean()
 
   # The control data is the "treated first" group in the second period,
   # and the "not treated first" group in the first period.
@@ -559,11 +561,12 @@ def _prepare_metrics_for_crossover_experiment(
 
   # Now adjust the mean again so that the adjusted control mean is the same
   # as the original control mean
-  y_control = y_1.copy()
-  y_control[is_treated_first] = y_2[is_treated_first].copy()
-  adjustment_factor = y_control.mean() - y_control_demeaned.mean()
-  y_control_demeaned += adjustment_factor
-  y_treatment_demeaned += adjustment_factor
+  if apply_demean:
+    y_control = y_1.copy()
+    y_control[is_treated_first] = y_2[is_treated_first].copy()
+    adjustment_factor = y_control.mean() - y_control_demeaned.mean()
+    y_control_demeaned += adjustment_factor
+    y_treatment_demeaned += adjustment_factor
 
   return y_treatment_demeaned, y_control_demeaned
 
@@ -577,7 +580,12 @@ def _analyze_crossover_experiment_single_metric(
 ) -> statistics.StatisticalTestResults:
   """Analyzes a crossover A/B test.
 
-  This applies Yuen's t-test to the dataset provided.
+  This applies Yuen's t-test to the dataset provided. If post_trim_percentile
+  is 0, then the data is de-meaned prior to analysis. However, if
+  post_trim_percentile > 0 then the de-meaning is not done, because it's
+  difficult with the trimming to ensure that the trimmed control mean is
+  unchanged after de-meaning, which can lead to strange downstream effects such
+  as the control mean being negative when all values are positive.
 
   Args:
     data: The dataset to be analyzed. Must contain the columns "test_1",
@@ -598,17 +606,18 @@ def _analyze_crossover_experiment_single_metric(
   Returns:
     The statistical test results.
   """
+  apply_demean = post_trim_percentile == 0.0
 
   y_treatment_demeaned, y_control_demeaned = (
       _prepare_metrics_for_crossover_experiment(
-          data, treatment_assignment_column
+          data, treatment_assignment_column, apply_demean
       )
   )
 
   if denominator_data is not None:
     denominator_y_treatment_demeaned, denominator_y_control_demeaned = (
         _prepare_metrics_for_crossover_experiment(
-            denominator_data, treatment_assignment_column
+            denominator_data, treatment_assignment_column, apply_demean
         )
     )
   else:

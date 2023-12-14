@@ -238,12 +238,12 @@ class AnalyzeSingleMetricTests(parameterized.TestCase):
     self.assertIsInstance(analysis_result, StatisticalTestResults)
 
   def test_analyze_crossover_experiment_returns_control_average_when_no_trimming_is_applied(
-      self,
+      self
   ):
     data = pd.DataFrame({
         "treatment_assignment": [0] * 5 + [1] * 5,
-        "test_1": np.linspace(0, 1, 10),
-        "test_2": np.linspace(0.5, 1.5, 10),
+        "test_1": [1.0, 2.0, 10.0, 1.0, 5.0, 20.0, 15.0, 11.0, 1.0, 1.0],
+        "test_2": [5.0, 7.0, 14.0, 3.0, 6.0, 40.0, 16.0, 9.0, 3.0, 2.0],
     }).set_index(["treatment_assignment"])
     data.columns = pd.MultiIndex.from_product([["clicks"], data.columns])
 
@@ -270,7 +270,9 @@ class AnalyzeSingleMetricTests(parameterized.TestCase):
         ].sum()
     ) / len(data_subset.index.values)
 
-    self.assertEqual(analysis_result.control_average, expected_control_average)
+    self.assertAlmostEqual(
+        analysis_result.control_average, expected_control_average
+    )
 
   def test_analyze_regular_experiment_returns_control_average_when_no_trimming_is_applied(
       self,
@@ -1166,75 +1168,75 @@ class ExperimentAnalysisTests(parameterized.TestCase):
         "is_significant": [False] * 5,
         "alpha": [0.05] * 5,
         "p_value": [
-            0.47832378754376703,
-            0.631473531978914,
+            0.47981624809392687,
+            0.6511785126328269,
             0.4342870505283397,
-            0.33781355925252377,
+            0.2884113251365828,
             0.34671790805522984,
         ],
         "statistic": [
-            -0.7120052883327112,
-            0.4813155592347688,
+            -0.7095853125199831,
+            0.4536590494716348,
             -0.7850703319578739,
-            -0.9636879444525706,
+            -1.0679944512388266,
             -0.9454758316151358,
         ],
         "absolute_difference": [
-            -0.3455555555555555,
-            1.9257777777777787,
+            -0.34444444444444444,
+            1.8111111111111111,
             -0.3508000000000001,
-            -0.012357918808163657,
+            -0.013757147908579084,
             -0.01046454347665346,
         ],
         "absolute_difference_lower_bound": [
-            -1.3098904272065506,
-            -6.024265288055011,
+            -1.3089567619248998,
+            -6.121364178796977,
             -1.2374254120867663,
-            -0.03783807717453217,
+            -0.039351999854460855,
             -0.032425892314840936,
         ],
         "absolute_difference_upper_bound": [
-            0.6187793160954469,
-            9.875820843610532,
+            0.6200678730360117,
+            9.743586401019197,
             0.5358254120867707,
-            0.013122239558204858,
+            0.011837704037302686,
             0.011496805361534017,
         ],
         "relative_difference": [
-            -0.07548287194124403,
-            0.039128711154617246,
+            -0.07524271844660191,
+            0.03679458239277644,
             -0.07626086956521705,
-            -0.1316491747495938,
+            -0.14394918600457385,
             -0.11135639199612779,
         ],
         "relative_difference_lower_bound": [
-            -0.2593046070918117,
-            -0.11450751537796222,
+            -0.25911816160063605,
+            -0.11515822156081912,
             -0.2449530881288059,
-            -0.3476976214717571,
+            -0.3553351642938345,
             -0.30461303788372396,
         ],
         "relative_difference_upper_bound": [
-            0.15217961614465603,
-            0.21767934579873627,
+            0.15250922160717417,
+            0.21735176439251713,
             0.13013226417039925,
-            0.16947559889323638,
+            0.15011624918105748,
             0.14331357952247625,
         ],
         "standard_error": [
-            0.4853272317186522,
-            4.001071107777033,
+            0.4854165360627364,
+            3.9922296562153146,
             0.4468389464229858,
-            0.012823568956425677,
+            0.012881291557855378,
             0.011068017951106278,
         ],
         "sample_size": [90, 90, 100, 90, 100],
         "degrees_of_freedom": [89, 89, 99, 89, 99],
         "control_average": [
-            4.577933333333327,
-            49.216488888888925,
+            4.5777777777777775,
+            49.22222222222222,
             4.599999999999994,
-            0.09387008184190522,
+            0.0955694734400371,
             0.09397344228804883,
         ],
     }).set_index("metric")

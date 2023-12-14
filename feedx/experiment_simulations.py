@@ -617,6 +617,16 @@ class SimulationAnalysis:
 
       primary_metric_average = 0.5 * (trimmed_means[1] + trimmed_means[2])
       primary_metric_variance = trimmed_var[0]
+
+      # If we have post trimming, then we don't demean the metrics (to ensure
+      # that the control average remains sensible). This means we need to add
+      # the extra variance introduced by the difference in the means in the two
+      # periods.
+      if self.design.post_trim_percentile > 0.0:
+        primary_metric_variance += (
+            trimmed_means[1] - trimmed_means[2]
+        ) ** 2 / 4
+
       sample_size = len(trimmed_stacked_values)
     else:
       if "pretest" in pivoted_data.columns:
