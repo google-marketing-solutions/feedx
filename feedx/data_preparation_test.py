@@ -1707,6 +1707,209 @@ class PrepareAndValidateHistoricalDataTests(parameterized.TestCase):
       )
 
 
+class PrepareAndValidateExperimentDataTests(parameterized.TestCase):
+
+  @mock_experiment_design_validation
+  def setUp(self, mock_experiment_design_validation):
+    super().setUp()
+    self.performance_data = pd.DataFrame({
+        "Item ID": [1, 1, 2],
+        "YYYY-MM-DD": ["2023-10-01", "2023-10-08", "2023-10-01"],
+        "Clicks": ["1", "2", "3"],
+        "Impr.": [20.0, 21.0, 22.0],
+        "Conv.": ["2", "3", "5"],
+        "Conv. Value": ["2.3", "4.2", "5.0"],
+        "Cost": [1, 2, 3],
+        "other_metric": [5, 2, 1],
+        "Some extra column": ["something", "something", "something"],
+    })
+    self.treatment_assignment_data = pd.DataFrame(
+        {"Item ID": [1, 2], "Assignment": [0, 1]}
+    )
+    self.design = experiment_design.ExperimentDesign(
+        n_items_before_trimming=2,
+        pre_trim_top_percentile=0.0,
+        pre_trim_bottom_percentile=0.0,
+        runtime_weeks=2,
+        pretest_weeks=0,
+        is_crossover=False,
+        post_trim_percentile=0.0,
+        primary_metric="clicks",
+        coinflip_salt="ab12",
+    )
+
+  def test_data_is_prepared_correctly(self):
+    processed_data = data_preparation.prepare_and_validate_experiment_data(
+        daily_performance_data=self.performance_data,
+        treatment_assignment_data=self.treatment_assignment_data,
+        design=self.design,
+        experiment_start_date="2023-10-01",
+        item_id_column="Item ID",
+        date_column="YYYY-MM-DD",
+        treatment_assignment_column="Assignment",
+        clicks_column="Clicks",
+        impressions_column="Impr.",
+        conversions_column="Conv.",
+        total_conversion_value_column="Conv. Value",
+        total_cost_column="Cost",
+        other_metric_columns=["other_metric"],
+    )
+
+    expected_processed_data = pd.DataFrame({
+        "item_id": ["1", "1", "2", "2"],
+        "date": pd.to_datetime(
+            ["2023-10-01", "2023-10-08", "2023-10-01", "2023-10-08"]
+        ),
+        "week_id": [0, 1, 0, 1],
+        "week_start": pd.to_datetime(
+            ["2023-10-01", "2023-10-08", "2023-10-01", "2023-10-08"]
+        ),
+        "time_period": ["test", "test", "test", "test"],
+        "treatment_assignment": [0, 0, 1, 1],
+        "clicks": [1, 2, 3, 0],
+        "impressions": [20, 21, 22, 0],
+        "conversions": [2, 3, 5, 0],
+        "total_conversion_value": [2.3, 4.2, 5.0, 0.0],
+        "total_cost": [1.0, 2.0, 3.0, 0.0],
+        "other_metric": [5.0, 2.0, 1.0, 0.0],
+    })
+    pd.testing.assert_frame_equal(
+        processed_data, expected_processed_data, check_like=True
+    )
+
+  def test_validate_experiment_data_is_called(self):
+    with mock.patch(
+        "google3.third_party.professional_services.solutions.feedx.feedx.data_preparation.validate_experiment_data",
+        side_effect=data_preparation.validate_experiment_data,
+    ) as mock_validate_experiment_data:
+      data_preparation.prepare_and_validate_experiment_data(
+          daily_performance_data=self.performance_data,
+          treatment_assignment_data=self.treatment_assignment_data,
+          design=self.design,
+          experiment_start_date="2023-10-01",
+          item_id_column="Item ID",
+          date_column="YYYY-MM-DD",
+          treatment_assignment_column="Assignment",
+          clicks_column="Clicks",
+          impressions_column="Impr.",
+          conversions_column="Conv.",
+          total_conversion_value_column="Conv. Value",
+          total_cost_column="Cost",
+          other_metric_columns=["other_metric"],
+      )
+      mock_validate_experiment_data.assert_called()
+
+  def test_standardize_column_names_and_types_is_called(self):
+    with mock.patch(
+        "google3.third_party.professional_services.solutions.feedx.feedx.data_preparation.standardize_column_names_and_types",
+        side_effect=data_preparation.standardize_column_names_and_types,
+    ) as mock_standardize_column_names_and_types:
+      data_preparation.prepare_and_validate_experiment_data(
+          daily_performance_data=self.performance_data,
+          treatment_assignment_data=self.treatment_assignment_data,
+          design=self.design,
+          experiment_start_date="2023-10-01",
+          item_id_column="Item ID",
+          date_column="YYYY-MM-DD",
+          treatment_assignment_column="Assignment",
+          clicks_column="Clicks",
+          impressions_column="Impr.",
+          conversions_column="Conv.",
+          total_conversion_value_column="Conv. Value",
+          total_cost_column="Cost",
+          other_metric_columns=["other_metric"],
+      )
+      mock_standardize_column_names_and_types.assert_called()
+
+  def test_fill_missing_rows_with_zeros_is_called(self):
+    with mock.patch(
+        "google3.third_party.professional_services.solutions.feedx.feedx.data_preparation.fill_missing_rows_with_zeros",
+        side_effect=data_preparation.fill_missing_rows_with_zeros,
+    ) as mock_fill_missing_rows_with_zeros:
+      data_preparation.prepare_and_validate_experiment_data(
+          daily_performance_data=self.performance_data,
+          treatment_assignment_data=self.treatment_assignment_data,
+          design=self.design,
+          experiment_start_date="2023-10-01",
+          item_id_column="Item ID",
+          date_column="YYYY-MM-DD",
+          treatment_assignment_column="Assignment",
+          clicks_column="Clicks",
+          impressions_column="Impr.",
+          conversions_column="Conv.",
+          total_conversion_value_column="Conv. Value",
+          total_cost_column="Cost",
+          other_metric_columns=["other_metric"],
+      )
+      mock_fill_missing_rows_with_zeros.assert_called()
+
+  def test_add_week_id_and_week_start_is_called(self):
+    with mock.patch(
+        "google3.third_party.professional_services.solutions.feedx.feedx.data_preparation.add_week_id_and_week_start",
+        side_effect=data_preparation.add_week_id_and_week_start,
+    ) as mock_add_week_id_and_week_start:
+      data_preparation.prepare_and_validate_experiment_data(
+          daily_performance_data=self.performance_data,
+          treatment_assignment_data=self.treatment_assignment_data,
+          design=self.design,
+          experiment_start_date="2023-10-01",
+          item_id_column="Item ID",
+          date_column="YYYY-MM-DD",
+          treatment_assignment_column="Assignment",
+          clicks_column="Clicks",
+          impressions_column="Impr.",
+          conversions_column="Conv.",
+          total_conversion_value_column="Conv. Value",
+          total_cost_column="Cost",
+          other_metric_columns=["other_metric"],
+      )
+      mock_add_week_id_and_week_start.assert_called()
+
+  def test_add_time_period_column_is_called(self):
+    with mock.patch(
+        "google3.third_party.professional_services.solutions.feedx.feedx.experiment_analysis.add_time_period_column",
+        side_effect=data_preparation.experiment_analysis.add_time_period_column,
+    ) as mock_add_time_period_column:
+      data_preparation.prepare_and_validate_experiment_data(
+          daily_performance_data=self.performance_data,
+          treatment_assignment_data=self.treatment_assignment_data,
+          design=self.design,
+          experiment_start_date="2023-10-01",
+          item_id_column="Item ID",
+          date_column="YYYY-MM-DD",
+          treatment_assignment_column="Assignment",
+          clicks_column="Clicks",
+          impressions_column="Impr.",
+          conversions_column="Conv.",
+          total_conversion_value_column="Conv. Value",
+          total_cost_column="Cost",
+          other_metric_columns=["other_metric"],
+      )
+      mock_add_time_period_column.assert_called()
+
+  def test_add_at_least_one_metrics_is_called(self):
+    with mock.patch(
+        "google3.third_party.professional_services.solutions.feedx.feedx.data_preparation.add_at_least_one_metrics",
+        side_effect=data_preparation.add_at_least_one_metrics,
+    ) as mock_add_at_least_one_metrics:
+      data_preparation.prepare_and_validate_experiment_data(
+          daily_performance_data=self.performance_data,
+          treatment_assignment_data=self.treatment_assignment_data,
+          design=self.design,
+          experiment_start_date="2023-10-01",
+          item_id_column="Item ID",
+          date_column="YYYY-MM-DD",
+          treatment_assignment_column="Assignment",
+          clicks_column="Clicks",
+          impressions_column="Impr.",
+          conversions_column="Conv.",
+          total_conversion_value_column="Conv. Value",
+          total_cost_column="Cost",
+          other_metric_columns=["other_metric"],
+      )
+      mock_add_at_least_one_metrics.assert_called()
+
+
 class TrimOutliersTest(parameterized.TestCase):
 
   def setUp(self):

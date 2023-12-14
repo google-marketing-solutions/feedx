@@ -27,6 +27,7 @@ import numpy.typing as npt
 import pandas as pd
 from scipy import stats
 
+from feedx import experiment_analysis
 from feedx import experiment_design
 
 
@@ -1259,6 +1260,155 @@ def prepare_and_validate_historical_data(
   )
 
   return clean_data
+
+
+def prepare_and_validate_experiment_data(
+    *,
+    daily_performance_data: pd.DataFrame,
+    treatment_assignment_data: pd.DataFrame,
+    design: experiment_design.ExperimentDesign,
+    experiment_start_date: str,
+    item_id_column: str,
+    date_column: str,
+    treatment_assignment_column: str,
+    clicks_column: str | None = None,
+    impressions_column: str | None = None,
+    total_cost_column: str | None = None,
+    conversions_column: str | None = None,
+    total_conversion_value_column: str | None = None,
+    other_metric_columns: list[str] | None = None,
+    can_be_negative_metric_columns: list[str] | None = None,
+    at_least_one_metrics: dict[str, str] | None = None,
+    experiment_has_concluded: bool = True,
+) -> pd.DataFrame:
+  """Prepares and validates the experiment data for the experiment analysis.
+
+  This performs the following steps before returning the cleaned data:
+
+    1. Standardize the column names and types.
+    2. Fill any missing date + item_id combinations with zeros.
+    3. Add a week_id and week start date column. Week id = 0 is the first
+       week of the experiment.
+    4. Add a column indicating the time period.
+    5. Add any at least one metrics, if specified.
+    6. Merge the performance data with the treatment assignments.
+    7. Perform validation checks on the data.
+
+  Args:
+    daily_performance_data: The raw performance data to be processed and
+      validated.
+    treatment_assignment_data: The raw treatment assignment data to be merged
+      with the performance data.
+    design: The experiment design to be analyzed.
+    experiment_start_date: The start date of the experiment. Must have the
+      format YYYY-MM-DD.
+    item_id_column: The name of the column containing the item ids in both
+      datasets.
+    date_column: The name of the column containing the dates.
+    treatment_assignment_column: The column containing the treatment assignment
+      in the treatment_assignment_data.
+    clicks_column: The column containing the clicks performance data.
+    impressions_column: The column containing the impressions performance data.
+    total_cost_column: The column name containing the total cost metric.
+    conversions_column: The column containing the number of conversions.
+    total_conversion_value_column: The column containing the total conversion
+      value.
+    other_metric_columns: All other metric columns to be analyzed. If no other
+      metrics, set as None. Defaults to None.
+    can_be_negative_metric_columns: The list of metrics that are allowed to be
+      negative. Defaults to None.
+    at_least_one_metrics: A mapping between the original column name and the new
+      column name for the "at least one" metric. For example, to calculate
+      at_least_one_click from clicks you would set metrics = {"clicks":
+      "at_least_one_click"}. If not adding any at least one metrics, set to
+      None. Defaults to None.
+    experiment_has_concluded: Has the experiment finished? Defaults to True.
+
+  Returns:
+    The processed data.
+  """
+  can_be_negative_metric_columns = can_be_negative_metric_columns or []
+  at_least_one_metrics = at_least_one_metrics or {}
+
+  metric_columns_lookup = {
+      "clicks": clicks_column,
+      "impressions": impressions_column,
+      "total_cost": total_cost_column,
+      "conversions": conversions_column,
+      "total_conversion_value": total_conversion_value_column,
+  }
+  metric_columns = [
+      clean_column
+      for clean_column, raw_column in metric_columns_lookup.items()
+      if raw_column is not None
+  ]
+
+  extra_standardize_args = {}
+  if other_metric_columns:
+    extra_standardize_args["custom_columns"] = {
+        column: column for column in other_metric_columns
+    }
+    extra_standardize_args["custom_parse_functions"] = {
+        column: lambda x: x.astype(float) for column in other_metric_columns
+    }
+    metric_columns += other_metric_columns
+
+  treatment_assignment_data = treatment_assignment_data.copy().rename(
+      columns={
+          item_id_column: "item_id",
+          treatment_assignment_column: "treatment_assignment",
+      }
+  )
+  treatment_assignment_data["item_id"] = treatment_assignment_data[
+      "item_id"
+  ].astype(str)
+  treatment_assignment_data["treatment_assignment"] = treatment_assignment_data[
+      "treatment_assignment"
+  ].astype(int)
+
+  experiment_data = (
+      daily_performance_data.copy()
+      .pipe(
+          standardize_column_names_and_types,
+          date_column=date_column,
+          item_id_column=item_id_column,
+          clicks_column=clicks_column,
+          impressions_column=impressions_column,
+          total_cost_column=total_cost_column,
+          conversions_column=conversions_column,
+          total_conversion_value_column=total_conversion_value_column,
+          **extra_standardize_args,
+      )
+      .pipe(fill_missing_rows_with_zeros)
+      .pipe(
+          add_week_id_and_week_start,
+          date_column="date",
+          experiment_start_date=experiment_start_date,
+      )
+      .pipe(
+          experiment_analysis.add_time_period_column,
+          design=design,
+          start_week_id=0,
+          week_id_column="week_id",
+      )
+      .pipe(add_at_least_one_metrics, metrics=at_least_one_metrics)
+      .merge(treatment_assignment_data, on="item_id")
+  )
+
+  validate_experiment_data(
+      experiment_data,
+      design=design,
+      experiment_start_date=experiment_start_date,
+      item_id_column="item_id",
+      date_column="date",
+      week_id_column="week_id",
+      treatment_assignment_column="treatment_assignment",
+      metric_columns=metric_columns,
+      can_be_negative_metric_columns=can_be_negative_metric_columns,
+      experiment_has_concluded=experiment_has_concluded,
+  )
+
+  return experiment_data
 
 
 def trim_outliers(
