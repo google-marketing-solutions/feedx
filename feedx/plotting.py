@@ -14,55 +14,36 @@
 
 """Plot historical and simulation data."""
 
-import altair as alt
+import matplotlib.pyplot as plt
 import pandas as pd
 
-COLORS = [
-    "#4285F4",
-    "#EA4335",
-    "#FBBC04",
-    "#34A853",
-    "#185ABC",
-    "#B31412",
-    "#EA8600",
-    "#137333"
-]
 
-
-def make_density_plot(
+def _make_density_plot(
     data: pd.DataFrame,
     column: str,
+    ax: plt.Axes,
     x_label: str | None = None,
-    y_label: str | None = None,
-    color_id: int = 0,
-):
-  """Make a density plot using altair visualizing distribution of the metric.
+    y_label: str | None = None
+    ) -> None:
+
+  """Make a density plot using matplotlib visualizing distribution of the metric.
   
   Args:
-    data: synthetic, historical, or experiment data
+    data: data for plotting
     column: name of metric column in the data (eg clicks or impressions)
+    ax: class containing the plotted data of the data set provided
     x_label: x-axis label. If not provided, column will be displayed
     y_label: y-axis label. If not provided, "Density" will be displayed
-    color_id: ID of selected color to display in the plot
-    
-  Returns:
-    Plot displaying proportion of items for a given number of clicks.
-  """
 
+  """
   x_label = x_label or column
   y_label = y_label or "Density"
 
-  density_base = alt.Chart(data).transform_density(
-      column,
-      as_=[x_label, y_label],
-  )
-
-  area = density_base.mark_area(opacity=0.3, color=COLORS[color_id])
-  line = density_base.mark_line(color=COLORS[color_id])
-
-  combined = (area + line).encode(
-      x=f'{x_label}:Q',
-      y=f'{y_label}:Q',
-  )
-
-  return combined
+  ax.hist(
+      data[column], bins="auto", histtype="stepfilled", alpha=0.5, color="C0",
+      label=f'{x_label}')
+  ax.hist(data[column], bins=100, histtype="step", alpha=1.0, color="C0")
+  ax.set_title(f'Density Plot of {x_label} Distribution')
+  ax.set_xlabel(x_label)
+  ax.set_ylabel(y_label)
+  ax.legend(title="Legend")
