@@ -19,3 +19,4 @@ scipy
 tqdm
 pyyaml
 pillow>=10.0.1
+jinja2
