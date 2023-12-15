@@ -257,7 +257,9 @@ Note: the analysis can analyze ratios of these metrics, so for example you wonâ€
 
 The data will need to cover the total runtime of the experiment, plus the pretest period that was part of the design. So if you had an 8 week runtime and a 4 week pre-test period, you will need to extract the last 12 weeks of data. 
 
-You then feed this data, as well as the experiment design yaml file and the treatment assignment sheet from step 1, into the analysis notebook, which will perform the analysis. It will return the estimated impact and a confidence interval for the impact the treatment had on every metric. 
+You then feed this data, as well as the experiment design yaml file and the treatment assignment sheet from step 1, into the analysis notebook, which will perform the analysis. It will return the estimated impact and a confidence interval for the impact the treatment had on every metric. For an example of how the results might look, see below:
+
+<img align="center" src="./images/feedx_results_plot.png" alt="feedx_results_plot" />
 
 #### Interpreting confidence intervals and statistical significance
 
@@ -280,17 +282,17 @@ The confidence interval is a similar concept, which says that if you ran the sam
 1. You start designing a new experiment, and the longest runtime you want to consider is 8 weeks. Your primary metric is clicks, and you have 10,000 items that you can test with. 
 1. You export 16 weeks of historical clicks data for those 10,000 items from Google Ads and import it into the design notebook.
 1. In the design notebook you simulate lots of different designs using that historical data. You try all of the combinations of the following parameters:
-  * Runtime weeks: 4, 6 or 8
-  * Pretest weeks: 2 or 4
-  * Experiment type: crossover or regular
-  * Pre-trimming percentile: 0.0, 0.01
-  * Post-trimming percentile: 0.0, 0.01
+    * Runtime weeks: 4, 6 or 8
+    * Pretest weeks: 2 or 4
+    * Experiment type: crossover or regular
+    * Pre-trimming percentile: 0.0, 0.01
+    * Post-trimming percentile: 0.0, 0.01
 1. The design notebook estimates the MDE for every combination of parameters, and you find the following combination has a relative MDE of 5%, which is the lowest of all the designs you tested:
-  * Runtime weeks: 8
-  * Pretest weeks: 4
-  * Experiment type: crossover
-  * Pre-trimming percentile: 0.01
-  * Post-trimming percentile: 0.0
+    * Runtime weeks: 8
+    * Pretest weeks: 4
+    * Experiment type: crossover
+    * Pre-trimming percentile: 0.01
+    * Post-trimming percentile: 0.0
 1. You think 5% is a reasonable impact to expect from the optimization you are testing, so you select this design.
 1. You run the validation step of the design notebook for that design, and it passes the validation checks.
 1. Because the optimal design has a pre-trimming percentile of 0.01, and pre-test weeks is 4, the design notebook ranks all the items based on the total clicks they got in the last 4 weeks, and then removes the top 1% of items based on that.
