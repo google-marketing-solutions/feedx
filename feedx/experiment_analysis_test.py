@@ -141,7 +141,7 @@ class AnalyzeSingleMetricTests(parameterized.TestCase):
     )
 
     with mock.patch(
-        "google3.third_party.professional_services.solutions.feedx.feedx.statistics.apply_cuped_adjustment",
+        "feedx.statistics.apply_cuped_adjustment",
         side_effect=lambda x, *y: x,
     ) as mock_apply_cuped_adjustment:
       experiment_analysis.analyze_single_metric(
@@ -168,7 +168,7 @@ class AnalyzeSingleMetricTests(parameterized.TestCase):
     )
 
     with mock.patch(
-        "google3.third_party.professional_services.solutions.feedx.feedx.statistics.apply_cuped_adjustment"
+        "feedx.statistics.apply_cuped_adjustment"
     ) as mock_apply_cuped_adjustment:
       experiment_analysis.analyze_single_metric(
           data,
@@ -455,7 +455,7 @@ class AnalyzeSingleMetricTests(parameterized.TestCase):
         **self.irrelevant_design_args
     )
     with mock.patch(
-        "google3.third_party.professional_services.solutions.feedx.feedx.statistics.TrimmedArray",
+        "feedx.statistics.TrimmedArray",
         side_effect=statistics.TrimmedArray,
     ) as mock_trimmed_array:
       experiment_analysis.analyze_single_metric(

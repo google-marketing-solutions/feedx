@@ -1280,7 +1280,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         **self.irrelevant_design_args
     )
     with mock.patch(
-        "google3.third_party.professional_services.solutions.feedx.feedx.data_preparation.validate_no_sample_ratio_mismatch",
+        "feedx.data_preparation.validate_no_sample_ratio_mismatch",
         side_effect=data_preparation.validate_no_sample_ratio_mismatch,
     ) as mock_validate_no_sample_ratio_mismatch:
       data_preparation.validate_experiment_data(
@@ -1636,7 +1636,7 @@ class PrepareAndValidateHistoricalDataTests(parameterized.TestCase):
 
   def test_validate_historical_data_is_called(self):
     with mock.patch(
-        "google3.third_party.professional_services.solutions.feedx.feedx.data_preparation.validate_historical_data",
+        "feedx.data_preparation.validate_historical_data",
         side_effect=data_preparation.validate_historical_data,
     ) as mock_validate_historical_data:
       data_preparation.prepare_and_validate_historical_data(
@@ -1651,7 +1651,7 @@ class PrepareAndValidateHistoricalDataTests(parameterized.TestCase):
 
   def test_standardize_column_names_and_types_is_called(self):
     with mock.patch(
-        "google3.third_party.professional_services.solutions.feedx.feedx.data_preparation.standardize_column_names_and_types",
+        "feedx.data_preparation.standardize_column_names_and_types",
         side_effect=data_preparation.standardize_column_names_and_types,
     ) as mock_standardize_column_names_and_types:
       data_preparation.prepare_and_validate_historical_data(
@@ -1666,7 +1666,7 @@ class PrepareAndValidateHistoricalDataTests(parameterized.TestCase):
 
   def test_fill_missing_rows_with_zeros_is_called(self):
     with mock.patch(
-        "google3.third_party.professional_services.solutions.feedx.feedx.data_preparation.fill_missing_rows_with_zeros",
+        "feedx.data_preparation.fill_missing_rows_with_zeros",
         side_effect=data_preparation.fill_missing_rows_with_zeros,
     ) as mock_fill_missing_rows_with_zeros:
       data_preparation.prepare_and_validate_historical_data(
@@ -1681,7 +1681,7 @@ class PrepareAndValidateHistoricalDataTests(parameterized.TestCase):
 
   def test_add_week_id_and_week_start_is_called(self):
     with mock.patch(
-        "google3.third_party.professional_services.solutions.feedx.feedx.data_preparation.add_week_id_and_week_start",
+        "feedx.data_preparation.add_week_id_and_week_start",
         side_effect=data_preparation.add_week_id_and_week_start,
     ) as mock_add_week_id_and_week_start:
       data_preparation.prepare_and_validate_historical_data(
@@ -1696,7 +1696,7 @@ class PrepareAndValidateHistoricalDataTests(parameterized.TestCase):
 
   def test_group_data_to_complete_weeks_is_called(self):
     with mock.patch(
-        "google3.third_party.professional_services.solutions.feedx.feedx.data_preparation.group_data_to_complete_weeks",
+        "feedx.data_preparation.group_data_to_complete_weeks",
         side_effect=data_preparation.group_data_to_complete_weeks,
     ) as mock_group_data_to_complete_weeks:
       data_preparation.prepare_and_validate_historical_data(
@@ -1711,7 +1711,7 @@ class PrepareAndValidateHistoricalDataTests(parameterized.TestCase):
 
   def test_downsample_items_is_called(self):
     with mock.patch(
-        "google3.third_party.professional_services.solutions.feedx.feedx.data_preparation.downsample_items",
+        "feedx.data_preparation.downsample_items",
         side_effect=data_preparation.downsample_items,
     ) as mock_downsample_items:
       data_preparation.prepare_and_validate_historical_data(
@@ -1812,7 +1812,7 @@ class PrepareAndValidateExperimentDataTests(parameterized.TestCase):
 
   def test_validate_experiment_data_is_called(self):
     with mock.patch(
-        "google3.third_party.professional_services.solutions.feedx.feedx.data_preparation.validate_experiment_data",
+        "feedx.data_preparation.validate_experiment_data",
         side_effect=data_preparation.validate_experiment_data,
     ) as mock_validate_experiment_data:
       data_preparation.prepare_and_validate_experiment_data(
@@ -1834,7 +1834,7 @@ class PrepareAndValidateExperimentDataTests(parameterized.TestCase):
 
   def test_standardize_column_names_and_types_is_called(self):
     with mock.patch(
-        "google3.third_party.professional_services.solutions.feedx.feedx.data_preparation.standardize_column_names_and_types",
+        "feedx.data_preparation.standardize_column_names_and_types",
         side_effect=data_preparation.standardize_column_names_and_types,
     ) as mock_standardize_column_names_and_types:
       data_preparation.prepare_and_validate_experiment_data(
@@ -1856,7 +1856,7 @@ class PrepareAndValidateExperimentDataTests(parameterized.TestCase):
 
   def test_fill_missing_rows_with_zeros_is_called(self):
     with mock.patch(
-        "google3.third_party.professional_services.solutions.feedx.feedx.data_preparation.fill_missing_rows_with_zeros",
+        "feedx.data_preparation.fill_missing_rows_with_zeros",
         side_effect=data_preparation.fill_missing_rows_with_zeros,
     ) as mock_fill_missing_rows_with_zeros:
       data_preparation.prepare_and_validate_experiment_data(
@@ -1878,7 +1878,7 @@ class PrepareAndValidateExperimentDataTests(parameterized.TestCase):
 
   def test_add_week_id_and_week_start_is_called(self):
     with mock.patch(
-        "google3.third_party.professional_services.solutions.feedx.feedx.data_preparation.add_week_id_and_week_start",
+        "feedx.data_preparation.add_week_id_and_week_start",
         side_effect=data_preparation.add_week_id_and_week_start,
     ) as mock_add_week_id_and_week_start:
       data_preparation.prepare_and_validate_experiment_data(
@@ -1900,7 +1900,7 @@ class PrepareAndValidateExperimentDataTests(parameterized.TestCase):
 
   def test_add_time_period_column_is_called(self):
     with mock.patch(
-        "google3.third_party.professional_services.solutions.feedx.feedx.experiment_analysis.add_time_period_column",
+        "feedx.experiment_analysis.add_time_period_column",
         side_effect=data_preparation.experiment_analysis.add_time_period_column,
     ) as mock_add_time_period_column:
       data_preparation.prepare_and_validate_experiment_data(
@@ -1922,7 +1922,7 @@ class PrepareAndValidateExperimentDataTests(parameterized.TestCase):
 
   def test_add_at_least_one_metrics_is_called(self):
     with mock.patch(
-        "google3.third_party.professional_services.solutions.feedx.feedx.data_preparation.add_at_least_one_metrics",
+        "feedx.data_preparation.add_at_least_one_metrics",
         side_effect=data_preparation.add_at_least_one_metrics,
     ) as mock_add_at_least_one_metrics:
       data_preparation.prepare_and_validate_experiment_data(
@@ -2123,7 +2123,7 @@ class PerformTreatmentAssignmentTests(parameterized.TestCase):
 
   def test_perform_treatment_assignment_checks_for_sample_ratio_mismatch(self):
     with mock.patch(
-        "google3.third_party.professional_services.solutions.feedx.feedx.data_preparation.validate_no_sample_ratio_mismatch",
+        "feedx.data_preparation.validate_no_sample_ratio_mismatch",
         side_effect=data_preparation.validate_no_sample_ratio_mismatch,
     ) as mock_validate_no_sample_ratio_mismatch:
       actual_assignments = data_preparation.perform_treatment_assignment(
