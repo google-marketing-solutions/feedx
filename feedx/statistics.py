@@ -576,24 +576,28 @@ def _relative_difference_confidence_interval(
   adjusted_1 = mean_1**2 - critical_t_value**2 * var_1
   adjusted_2 = mean_2**2 - critical_t_value**2 * var_2
 
-  ratio_lower_bound_from_data = (
-      adjusted_12 - np.sqrt(adjusted_12**2 - adjusted_1 * adjusted_2)
-  ) / adjusted_2
-  ratio_upper_bound_from_data = (
-      adjusted_12 + np.sqrt(adjusted_12**2 - adjusted_1 * adjusted_2)
-  ) / adjusted_2
-
   if t_complete_sq <= critical_t_value**2:
     # The confidence interval is completely unbounded
     ratio_lower_bound = 0.0
     ratio_upper_bound = np.inf
-  elif t_exclusive_sq <= critical_t_value**2:
-    # The confidence interval is partially unbounded
-    ratio_lower_bound = ratio_lower_bound_from_data
-    ratio_upper_bound = np.inf
   else:
-    ratio_lower_bound = np.max([0.0, ratio_lower_bound_from_data])
-    ratio_upper_bound = ratio_upper_bound_from_data
+    # The lower bound for a ratio can never be less than 0 assuming both
+    # values are positive.
+    ratio_lower_bound = np.clip(
+        (adjusted_12 - np.sqrt(adjusted_12**2 - adjusted_1 * adjusted_2))
+        / adjusted_2,
+        a_min=0.0,
+        a_max=None,
+    )
+
+    if t_exclusive_sq <= critical_t_value**2:
+      # The confidence interval is partially unbounded, meaning the upper bound
+      # is infinite but there is still a finite lower bound.
+      ratio_upper_bound = np.inf
+    else:
+      ratio_upper_bound = (
+          adjusted_12 + np.sqrt(adjusted_12**2 - adjusted_1 * adjusted_2)
+      ) / adjusted_2
 
   lower_bound = ratio_lower_bound - 1.0
   upper_bound = ratio_upper_bound - 1.0
