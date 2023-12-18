@@ -68,8 +68,8 @@ class AnalyzeSingleMetricTests(parameterized.TestCase):
   def test_analyze_regular_experiment_returns_analysis_results(self):
     data = pd.DataFrame({
         "treatment_assignment": [0] * 5 + [1] * 5,
-        "test": np.linspace(0, 1, 10),
-        "pretest": np.ones(10),
+        "test": [0.2, 0.5, 0.6, 0.3, 0.1, 0.15, 0.64, 0.3, 0.2, 0.9],
+        "pretest": [0.4, 0.2, 0.6, 0.1, 0.2, 0.4, 0.2, 0.6, 0.1, 0.2],
     }).set_index(["treatment_assignment"])
     data.columns = pd.MultiIndex.from_product([["clicks"], data.columns])
 
@@ -93,15 +93,19 @@ class AnalyzeSingleMetricTests(parameterized.TestCase):
   ):
     data = pd.DataFrame({
         "treatment_assignment": [0] * 5 + [1] * 5,
-        "test": np.linspace(0, 1, 10),
-        "pretest": np.ones(10),
+        "test": [0.2, 0.5, 0.6, 0.3, 0.1, 0.15, 0.64, 0.3, 0.2, 0.9],
+        "pretest": [0.4, 0.2, 0.6, 0.1, 0.2, 0.4, 0.2, 0.6, 0.1, 0.2],
     }).set_index(["treatment_assignment"])
     data.columns = pd.MultiIndex.from_product([["clicks"], data.columns])
 
     denominator_data = pd.DataFrame({
         "treatment_assignment": [0] * 5 + [1] * 5,
-        "test": np.linspace(10, 20, 10),
-        "pretest": 10 * np.ones(10),
+        "test": 10 * np.array(
+            [0.2, 0.5, 0.6, 0.3, 0.1, 0.15, 0.64, 0.3, 0.2, 0.9]
+        ),
+        "pretest": 10 * np.array(
+            [0.4, 0.2, 0.6, 0.1, 0.2, 0.4, 0.2, 0.6, 0.1, 0.2]
+        ),
     }).set_index(["treatment_assignment"])
     denominator_data.columns = pd.MultiIndex.from_product(
         [["impressions"], denominator_data.columns]
@@ -128,8 +132,8 @@ class AnalyzeSingleMetricTests(parameterized.TestCase):
   def test_analyze_regular_experiment_uses_cuped_when_pretest_is_provided(self):
     data = pd.DataFrame({
         "treatment_assignment": [0] * 5 + [1] * 5,
-        "test": np.linspace(0, 1, 10),
-        "pretest": [0, 1] * 5,
+        "test": [0.2, 0.5, 0.6, 0.3, 0.1, 0.15, 0.64, 0.3, 0.2, 0.9],
+        "pretest": [0.4, 0.2, 0.6, 0.1, 0.2, 0.4, 0.2, 0.6, 0.1, 0.2],
     }).set_index(["treatment_assignment"])
     data.columns = pd.MultiIndex.from_product([["clicks"], data.columns])
 
@@ -156,7 +160,7 @@ class AnalyzeSingleMetricTests(parameterized.TestCase):
   ):
     data = pd.DataFrame({
         "treatment_assignment": [0] * 5 + [1] * 5,
-        "test": np.linspace(0, 1, 10),
+        "test": [0.2, 0.5, 0.6, 0.3, 0.1, 0.15, 0.64, 0.3, 0.2, 0.9],
     }).set_index(["treatment_assignment"])
     data.columns = pd.MultiIndex.from_product([["clicks"], data.columns])
 
@@ -180,8 +184,8 @@ class AnalyzeSingleMetricTests(parameterized.TestCase):
   def test_analyze_crossover_experiment_returns_analysis_results(self):
     data = pd.DataFrame({
         "treatment_assignment": [0] * 5 + [1] * 5,
-        "test_1": np.linspace(0, 1, 10),
-        "test_2": np.linspace(0.5, 1.5, 10),
+        "test_1": [0.2, 0.5, 0.6, 0.3, 0.1, 0.15, 0.64, 0.3, 0.2, 0.9],
+        "test_2": [0.4, 0.2, 0.6, 0.1, 0.2, 0.4, 0.2, 0.6, 0.1, 0.2],
     }).set_index(["treatment_assignment"])
     data.columns = pd.MultiIndex.from_product([["clicks"], data.columns])
 
@@ -205,15 +209,15 @@ class AnalyzeSingleMetricTests(parameterized.TestCase):
   ):
     data = pd.DataFrame({
         "treatment_assignment": [0] * 5 + [1] * 5,
-        "test_1": np.linspace(0, 1, 10),
-        "test_2": np.linspace(0.5, 1.5, 10),
+        "test_1": [0.2, 0.5, 0.6, 0.3, 0.1, 0.15, 0.64, 0.3, 0.2, 0.9],
+        "test_2": [0.4, 0.2, 0.6, 0.1, 0.2, 0.4, 0.2, 0.6, 0.1, 0.2],
     }).set_index(["treatment_assignment"])
     data.columns = pd.MultiIndex.from_product([["clicks"], data.columns])
 
     denominator_data = pd.DataFrame({
         "treatment_assignment": [0] * 5 + [1] * 5,
-        "test_1": np.linspace(10, 20, 10),
-        "test_2": np.linspace(15, 25, 10),
+        "test_1": [0.2, 0.5, 0.6, 0.3, 0.1, 0.15, 0.64, 0.3, 0.2, 0.9],
+        "test_2": [0.4, 0.2, 0.6, 0.1, 0.2, 0.4, 0.2, 0.6, 0.1, 0.2],
     }).set_index(["treatment_assignment"])
     denominator_data.columns = pd.MultiIndex.from_product(
         [["impressions"], denominator_data.columns]
@@ -279,7 +283,7 @@ class AnalyzeSingleMetricTests(parameterized.TestCase):
   ):
     data = pd.DataFrame({
         "treatment_assignment": [0] * 5 + [1] * 5,
-        "test": np.linspace(0, 1, 10),
+        "test": [0.2, 0.5, 0.6, 0.3, 0.1, 0.15, 0.64, 0.3, 0.2, 0.9],
     }).set_index(["treatment_assignment"])
     data.columns = pd.MultiIndex.from_product([["clicks"], data.columns])
 
@@ -309,8 +313,8 @@ class AnalyzeSingleMetricTests(parameterized.TestCase):
   ):
     data = pd.DataFrame({
         "treatment": [0] * 5 + [1] * 5,
-        "test_1": np.linspace(0, 1, 10),
-        "test_2": np.linspace(0.5, 1.5, 10),
+        "test_1": [0.2, 0.5, 0.6, 0.3, 0.1, 0.15, 0.64, 0.3, 0.2, 0.9],
+        "test_2": [0.4, 0.2, 0.6, 0.1, 0.2, 0.4, 0.2, 0.6, 0.1, 0.2],
     }).set_index(["treatment"])
 
     data.columns = pd.MultiIndex.from_product([["clicks"], data.columns])
@@ -335,8 +339,8 @@ class AnalyzeSingleMetricTests(parameterized.TestCase):
   ):
     data = pd.DataFrame({
         "treatment_assignment": [0] * 5 + [1] * 5,
-        "test_1": np.linspace(0, 1, 10),
-        "test_2": np.linspace(0.5, 1.5, 10),
+        "test_1": [0.2, 0.5, 0.6, 0.3, 0.1, 0.15, 0.64, 0.3, 0.2, 0.9],
+        "test_2": [0.4, 0.2, 0.6, 0.1, 0.2, 0.4, 0.2, 0.6, 0.1, 0.2],
     }).set_index(["treatment_assignment"])
 
     data.drop(columns=required_missing_column, inplace=True)
@@ -362,8 +366,8 @@ class AnalyzeSingleMetricTests(parameterized.TestCase):
   ):
     data = pd.DataFrame({
         "treatment_assignment": [0] * 5 + [1] * 5,
-        "test": np.linspace(0, 1, 10),
-        "pretest": np.linspace(0, 1, 10),
+        "test": [0.2, 0.5, 0.6, 0.3, 0.1, 0.15, 0.64, 0.3, 0.2, 0.9],
+        "pretest": [0.4, 0.2, 0.6, 0.1, 0.2, 0.4, 0.2, 0.6, 0.1, 0.2],
     }).set_index(["treatment_assignment"])
 
     data.drop(columns=required_missing_column, inplace=True)
@@ -386,7 +390,7 @@ class AnalyzeSingleMetricTests(parameterized.TestCase):
   def test_pretest_column_not_required_if_pretest_weeks_is_0(self):
     data = pd.DataFrame({
         "treatment_assignment": [0] * 5 + [1] * 5,
-        "test": np.linspace(0, 1, 10),
+        "test": [0.2, 0.5, 0.6, 0.3, 0.1, 0.15, 0.64, 0.3, 0.2, 0.9],
     }).set_index(["treatment_assignment"])
     data.columns = pd.MultiIndex.from_product([["clicks"], data.columns])
 
@@ -411,10 +415,10 @@ class AnalyzeSingleMetricTests(parameterized.TestCase):
   ):
     data = pd.DataFrame({
         "treatment_assignment": [0] * 5 + [1] * 5,
-        "pretest": np.linspace(0, 1, 10),
-        "test": np.linspace(0, 1, 10),
-        "test_1": np.linspace(0, 1, 10),
-        "test_2": np.linspace(0.5, 1.5, 10),
+        "pretest": [0.4, 0.2, 0.6, 0.1, 0.2, 0.4, 0.2, 0.6, 0.1, 0.2],
+        "test": [0.2, 0.5, 0.6, 0.3, 0.1, 0.15, 0.64, 0.3, 0.2, 0.9],
+        "test_1": [0.2, 0.5, 0.6, 0.3, 0.1, 0.15, 0.64, 0.3, 0.2, 0.9],
+        "test_2": [0.4, 0.2, 0.6, 0.1, 0.2, 0.4, 0.2, 0.6, 0.1, 0.2],
     }).set_index(["treatment_assignment"])
     data.columns = pd.MultiIndex.from_product([["clicks"], data.columns])
 
@@ -441,10 +445,10 @@ class AnalyzeSingleMetricTests(parameterized.TestCase):
   ):
     data = pd.DataFrame({
         "treatment_assignment": [0] * 5 + [1] * 5,
-        "pretest": np.linspace(0, 1, 10),
-        "test": np.linspace(0, 1, 10),
-        "test_1": np.linspace(0, 1, 10),
-        "test_2": np.linspace(0.5, 1.5, 10),
+        "pretest": [0.4, 0.2, 0.6, 0.1, 0.2, 0.4, 0.2, 0.6, 0.1, 0.2],
+        "test": [0.2, 0.5, 0.6, 0.3, 0.1, 0.15, 0.64, 0.3, 0.2, 0.9],
+        "test_1": [0.2, 0.5, 0.6, 0.3, 0.1, 0.15, 0.64, 0.3, 0.2, 0.9],
+        "test_2": [0.4, 0.2, 0.6, 0.1, 0.2, 0.4, 0.2, 0.6, 0.1, 0.2],
     }).set_index(["treatment_assignment"])
     data.columns = pd.MultiIndex.from_product([["clicks"], data.columns])
 
@@ -1100,8 +1104,8 @@ class ExperimentAnalysisTests(parameterized.TestCase):
     self.data = pd.DataFrame({
         "item_id": list(range(100)) * 5,
         "week_id": [-1] * 100 + [0] * 100 + [1] * 100 + [2] * 100 + [3] * 100,
-        "clicks": rng.choice(10, size=500),
-        "impressions": rng.choice(100, size=500),
+        "clicks": rng.choice(10, size=500).astype(float),
+        "impressions": rng.choice(100, size=500).astype(float),
     })
     coinflip = experiment_design.Coinflip(salt="abc123")
     self.data["treatment_assignment"] = self.data["item_id"].apply(coinflip)

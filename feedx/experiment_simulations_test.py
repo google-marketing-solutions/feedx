@@ -1576,7 +1576,7 @@ class SummaryDataframeTests(parameterized.TestCase):
     self.historical_data = pd.DataFrame({
         "item_id": list(range(60)) * 6,
         "week_id": sorted(list(range(6)) * 60),
-        "clicks": rng.integers(0, 10, 60 * 6),
+        "clicks": rng.integers(0, 10, 60 * 6).astype(float),
     })
 
   def test_make_analysis_summary_dataframe_returns_expected_columns(self):
