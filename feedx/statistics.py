@@ -191,7 +191,7 @@ class TrimmedArray:
     if self._is_2d:
       return cov
     else:
-      return float(cov[0])
+      return float(cov.flatten()[0])
 
   def var(self, ddof: int = 0) -> np.ndarray | float:
     """Calculates the winsorized variance.
