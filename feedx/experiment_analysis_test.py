@@ -100,12 +100,8 @@ class AnalyzeSingleMetricTests(parameterized.TestCase):
 
     denominator_data = pd.DataFrame({
         "treatment_assignment": [0] * 5 + [1] * 5,
-        "test": 10 * np.array(
-            [0.2, 0.5, 0.6, 0.3, 0.1, 0.15, 0.64, 0.3, 0.2, 0.9]
-        ),
-        "pretest": 10 * np.array(
-            [0.4, 0.2, 0.6, 0.1, 0.2, 0.4, 0.2, 0.6, 0.1, 0.2]
-        ),
+        "test": [0.4, 0.3, 0.7, 1.1, 1.5, 0.8, 0.3, 0.2, 0.2, 0.5],
+        "pretest": [0.3, 0.6, 0.7, 0.2, 2.0, 7.0, 2.0, 1.0, 0.4, 0.1],
     }).set_index(["treatment_assignment"])
     denominator_data.columns = pd.MultiIndex.from_product(
         [["impressions"], denominator_data.columns]
@@ -216,8 +212,8 @@ class AnalyzeSingleMetricTests(parameterized.TestCase):
 
     denominator_data = pd.DataFrame({
         "treatment_assignment": [0] * 5 + [1] * 5,
-        "test_1": [0.2, 0.5, 0.6, 0.3, 0.1, 0.15, 0.64, 0.3, 0.2, 0.9],
-        "test_2": [0.4, 0.2, 0.6, 0.1, 0.2, 0.4, 0.2, 0.6, 0.1, 0.2],
+        "test_1": [0.4, 0.3, 0.7, 1.1, 1.5, 0.8, 0.3, 0.2, 0.2, 0.5],
+        "test_2": [0.3, 0.6, 0.7, 0.2, 2.0, 7.0, 2.0, 1.0, 0.4, 0.1],
     }).set_index(["treatment_assignment"])
     denominator_data.columns = pd.MultiIndex.from_product(
         [["impressions"], denominator_data.columns]
