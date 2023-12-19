@@ -348,6 +348,7 @@ class StatisticalTestResults:
     sample_size: The size of the sample of data from which these statistics were
       calculated.
     degrees_of_freedom: The degrees of freedom of the statistical test.
+    control_average: The average of the metric in the control group.
   """
 
   is_significant: bool
@@ -369,7 +370,6 @@ class StatisticalTestResults:
 def _ttest_from_stats(
     point_estimate: float,
     standard_error: float,
-    sample_size: int,
     degrees_of_freedom: int | float,
     alternative: str,
 ) -> tuple[float, float]:
@@ -384,7 +384,6 @@ def _ttest_from_stats(
   Args:
     point_estimate: The point estimate being evaluated.
     standard_error: The standard error of the point estimate.
-    sample_size: The size of the sample used to estimate the point estimate.
     degrees_of_freedom: The estimated degrees of freedom of the estimate.
     alternative: The alternative hypothesis to test, one of ['two-sided',
       'greater', 'less']
@@ -876,7 +875,6 @@ def yuens_t_test_paired(
   statistic, p_value = _ttest_from_stats(
       point_estimate=absolute_difference,
       standard_error=absolute_difference_standard_error,
-      sample_size=sample_size,
       degrees_of_freedom=degrees_of_freedom,
       alternative=alternative,
   )
@@ -1070,7 +1068,6 @@ def yuens_t_test_ind(
   statistic, p_value = _ttest_from_stats(
       point_estimate=absolute_difference,
       standard_error=standard_error,
-      sample_size=n1 + n2,
       degrees_of_freedom=degrees_of_freedom,
       alternative=alternative,
   )
