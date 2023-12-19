@@ -1364,8 +1364,16 @@ class ExperimentAnalysisTests(parameterized.TestCase):
 
     pd.testing.assert_frame_equal(results, expected_results, check_like=True)
 
+  @parameterized.product(
+      include_relative_effect=[True, False],
+      include_absolute_effect=[True, False],
+      include_yearly_projected_effect=[True, False],
+  )
   def test_format_experiment_analysis_results_dataframe_returns_dataframe_styler(
       self,
+      include_relative_effect,
+      include_absolute_effect,
+      include_yearly_projected_effect,
   ):
     metrics = [
         experiment_analysis.Metric(name="Clicks", column="clicks"),
@@ -1395,7 +1403,10 @@ class ExperimentAnalysisTests(parameterized.TestCase):
 
     formatted_results = (
         experiment_analysis.format_experiment_analysis_results_dataframe(
-            results
+            results,
+            include_relative_effect=include_relative_effect,
+            include_absolute_effect=include_absolute_effect,
+            include_yearly_projected_effect=include_yearly_projected_effect,
         )
     )
     shown_columns = formatted_results.columns[[
@@ -1403,14 +1414,27 @@ class ExperimentAnalysisTests(parameterized.TestCase):
         for n in range(len(formatted_results.columns))
         if n not in formatted_results.hidden_columns
     ]].values.tolist()
+
     expected_columns = [
-        ("Relative Effect Size", "Point Estimate"),
-        ("Relative Effect Size", "95% CI"),
-        ("Absolute Effect Size (per item per week)", "Point Estimate"),
-        ("Absolute Effect Size (per item per week)", "95% CI"),
         ("P-value", ""),
     ]
-    self.assertListEqual(expected_columns, shown_columns)
+    if include_relative_effect:
+      expected_columns += [
+          ("Relative Effect Size", "Point Estimate"),
+          ("Relative Effect Size", "95% CI"),
+      ]
+    if include_absolute_effect:
+      expected_columns += [
+          ("Absolute Effect Size (per item per week)", "Point Estimate"),
+          ("Absolute Effect Size (per item per week)", "95% CI"),
+      ]
+    if include_yearly_projected_effect:
+      expected_columns += [
+          ("Projected Effect Size (whole feed, per year)", "Point Estimate"),
+          ("Projected Effect Size (whole feed, per year)", "95% CI"),
+      ]
+
+    self.assertCountEqual(expected_columns, shown_columns)
 
 
 if __name__ == "__main__":

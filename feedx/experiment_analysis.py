@@ -851,6 +851,20 @@ def _format_absolute_effect_ci_string(
   )
 
 
+def _format_yearly_projected_effect_ci_string(
+    row: pd.Series, decimal_places: int = 0
+) -> str:
+  """Used for displaying the results."""
+  y_lb = 52 * row["sample_size"] * row["absolute_difference_lower_bound"]
+  y_ub = 52 * row["sample_size"] * row["absolute_difference_upper_bound"]
+
+  return (
+      f"{{y_lb:+,.{decimal_places}f}} to {{y_ub:+,.{decimal_places}f}}".format(
+          y_lb=y_lb, y_ub=y_ub
+      )
+  )
+
+
 def _format_p_value(row: pd.Series) -> str:
   """Used for displaying the results."""
   p_value = row["p_value"]
@@ -883,21 +897,40 @@ def _highlight_significant(row: pd.Series, props: str = "") -> list[str]:
 
 def format_experiment_analysis_results_dataframe(
     experiment_results: pd.DataFrame,
+    include_relative_effect: bool = True,
+    include_absolute_effect: bool = True,
+    include_yearly_projected_effect: bool = False,
     relative_effect_decimal_places: int = 2,
     absolute_effect_significant_figures: int = 3,
+    yearly_projected_effect_decimal_places: int = 0,
 ) -> style.Styler:
   """Formats the experiment analysis results for displaying in a notebook.
 
-  This formats the absolute and relative effect sizes, confidence intervals
-  and p-values for all the results, and highlights statistically significant
-  results.
+  This formats the absolute, relative and projected effect sizes, confidence
+  intervals and p-values for all the results, and highlights statistically
+  significant results.
+
+  The projected effect size is the absolute effect size, multipled by the number
+  of items in the experiment, and multipled by 52 (to scale from weekly
+  to yearly). This is a naive projection, which doesn't account for any
+  seasonality.
 
   Args:
     experiment_results: The results of the experiment.
+    include_relative_effect: Whether to include the relative effect size in the
+      dataframe. Defaults to True.
+    include_absolute_effect: Whether to include the absolute effect size (per
+      item per week) in the dataframe. Defaults to True.
+    include_yearly_projected_effect: Whether to include the projected effect
+      size (whole feed, per year) in the dataframe. Not relavent for ratio
+      metrics, since it does a naive scale up of the absolute effect size.
+      Defaults to False.
     relative_effect_decimal_places: Number of decimal places to round the
       relative effect sizes to.
     absolute_effect_significant_figures: Number of significant figures to round
       the absolute effect sizes to.
+    yearly_projected_effect_decimal_places: Number of decimal places to round
+      the projected effect sizes to.
 
   Returns:
     The formatted and styled dataframe.
@@ -906,30 +939,54 @@ def format_experiment_analysis_results_dataframe(
   display_data = experiment_results.copy()
 
   # Format the relative effect sizes
-  display_data[("Relative Effect Size", "Point Estimate")] = display_data[
-      "relative_difference"
-  ].apply(f"{{:+.{relative_effect_decimal_places}%}}".format)
-  display_data[("Relative Effect Size", f"{ci:.0%} CI")] = display_data.apply(
-      lambda x: _format_relative_effect_ci_string(
-          x, relative_effect_decimal_places
-      ),
-      axis=1,
-  )
+  if include_relative_effect:
+    display_data[("Relative Effect Size", "Point Estimate")] = display_data[
+        "relative_difference"
+    ].apply(f"{{:+.{relative_effect_decimal_places}%}}".format)
+    display_data[("Relative Effect Size", f"{ci:.0%} CI")] = display_data.apply(
+        lambda x: _format_relative_effect_ci_string(
+            x, relative_effect_decimal_places
+        ),
+        axis=1,
+    )
 
   # Format the absolute effect sizes
-  display_data[
-      ("Absolute Effect Size (per item per week)", "Point Estimate")
-  ] = display_data["absolute_difference"].apply(
-      f"{{:+,.{absolute_effect_significant_figures}g}}".format
-  )
-  display_data[("Absolute Effect Size (per item per week)", f"{ci:.0%} CI")] = (
-      display_data.apply(
-          lambda x: _format_absolute_effect_ci_string(
-              x, absolute_effect_significant_figures
-          ),
-          axis=1,
-      )
-  )
+  if include_absolute_effect:
+    display_data[
+        ("Absolute Effect Size (per item per week)", "Point Estimate")
+    ] = display_data["absolute_difference"].apply(
+        f"{{:+,.{absolute_effect_significant_figures}g}}".format
+    )
+    display_data[
+        ("Absolute Effect Size (per item per week)", f"{ci:.0%} CI")
+    ] = display_data.apply(
+        lambda x: _format_absolute_effect_ci_string(
+            x, absolute_effect_significant_figures
+        ),
+        axis=1,
+    )
+
+  # Format the projected effect sizes
+  # The projected effect is the absolute effect scaled to the whole feed
+  # and naively scaled up to 1 year (by multiplying the weekly impact by 52).
+  # Note: This is a simple calculation, it does not account for seasonality.
+  if include_yearly_projected_effect:
+    projected_effect = (
+        52 * display_data["sample_size"] * display_data["absolute_difference"]
+    )
+    display_data[
+        ("Projected Effect Size (whole feed, per year)", "Point Estimate")
+    ] = projected_effect.apply(
+        f"{{:+,.{yearly_projected_effect_decimal_places}f}}".format
+    )
+    display_data[
+        ("Projected Effect Size (whole feed, per year)", f"{ci:.0%} CI")
+    ] = display_data.apply(
+        lambda x: _format_yearly_projected_effect_ci_string(
+            x, yearly_projected_effect_decimal_places
+        ),
+        axis=1,
+    )
 
   # Format the p-values
   display_data[("P-value", "")] = display_data.apply(_format_p_value, axis=1)
