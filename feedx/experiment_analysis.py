@@ -15,11 +15,15 @@
 """Module containing functions for analyzing experiment results."""
 from collections.abc import Collection
 import dataclasses
+import warnings
 
 import numpy as np
 import pandas as pd
 from pandas.io.formats import style
-import tqdm.autonotebook as tqdm
+
+with warnings.catch_warnings():
+  warnings.filterwarnings("ignore")
+  import tqdm.autonotebook as tqdm
 
 from feedx import experiment_design
 from feedx import statistics

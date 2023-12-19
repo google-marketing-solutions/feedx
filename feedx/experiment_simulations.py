@@ -17,13 +17,17 @@
 from collections.abc import Collection
 import dataclasses
 import itertools
+import warnings
 
 import matplotlib as mpl
 import numpy as np
 import pandas as pd
 from pandas.io.formats import style
 from scipy import stats
-import tqdm.autonotebook as tqdm
+
+with warnings.catch_warnings():
+  warnings.filterwarnings("ignore")
+  import tqdm.autonotebook as tqdm
 
 from feedx import data_preparation
 from feedx import experiment_analysis
