@@ -549,8 +549,8 @@ def _prepare_metrics_for_crossover_experiment(
   y_1_demeaned = y_1.copy()
   y_2_demeaned = y_2.copy()
   if apply_demean:
-    y_1_demeaned -= y_1.mean()
-    y_2_demeaned -= y_2.mean()
+    y_1_demeaned = y_1_demeaned - y_1.mean()
+    y_2_demeaned = y_2_demeaned - y_2.mean()
 
   # The control data is the "treated first" group in the second period,
   # and the "not treated first" group in the first period.
