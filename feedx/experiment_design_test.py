@@ -217,6 +217,28 @@ class ExperimentDesignTest(parameterized.TestCase):
 
     self.assertEqual(design.design_id, unchanged_design.design_id)
 
+  def test_design_id_is_same_if_args_are_same_except_for_coinflip_salt(self):
+    design_args = dict(
+        n_items_before_trimming=1000,
+        runtime_weeks=6,
+        primary_metric="clicks",
+        pretest_weeks=4,
+        is_crossover=True,
+        pre_trim_top_percentile=0.1,
+        pre_trim_bottom_percentile=0.3,
+        post_trim_percentile=0.2,
+        crossover_washout_weeks=2,
+        alpha=0.05,
+        power=0.8,
+    )
+
+    design = ExperimentDesign(**design_args)
+    design_different_coinflip_salt = ExperimentDesign(
+        coinflip_salt="different_coinflip_salt", **design_args
+    )
+
+    self.assertEqual(design.design_id, design_different_coinflip_salt.design_id)
+
   def test_design_can_be_written_to_yaml(self):
     design = ExperimentDesign(
         n_items_before_trimming=1000,

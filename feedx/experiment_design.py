@@ -146,9 +146,15 @@ class ExperimentDesign:
 
   @property
   def design_id(self) -> str:
-    """Returns a unique identifier for the design."""
+    """Returns a unique identifier for the design.
 
-    return hashlib.md5(repr(self).encode("utf-8")).hexdigest()
+    This ignores the coinflip salt, so two designs that are otherwise identical
+    but have different coinflip salts will still have the same design_id.
+    """
+    self_without_coinflip_salt = dataclasses.replace(self, coinflip_salt=None)
+    return hashlib.md5(
+        repr(self_without_coinflip_salt).encode("utf-8")
+    ).hexdigest()
 
   @classmethod
   def load_from_yaml(cls, file_path: str) -> "ExperimentDesign":
