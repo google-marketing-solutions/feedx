@@ -1809,6 +1809,90 @@ class PrepareAndValidateExperimentDataTests(parameterized.TestCase):
         processed_data, expected_processed_data, check_like=True
     )
 
+  def test_missing_item_ids_are_filled_with_zeros(self):
+    treatment_assignment_data = pd.DataFrame(
+        {"Item ID": [1, 2, 3], "Assignment": [0, 1, 1]}
+    )  # Item ID 3 does not exist in the performance data
+    self.design.n_items_after_pre_trim = 3
+
+    processed_data = data_preparation.prepare_and_validate_experiment_data(
+        daily_performance_data=self.performance_data,
+        treatment_assignment_data=treatment_assignment_data,
+        design=self.design,
+        experiment_start_date="2023-10-01",
+        item_id_column="Item ID",
+        date_column="YYYY-MM-DD",
+        treatment_assignment_column="Assignment",
+        clicks_column="Clicks",
+        impressions_column="Impr.",
+        conversions_column="Conv.",
+        total_conversion_value_column="Conv. Value",
+        total_cost_column="Cost",
+        other_metric_columns=["other_metric"],
+    )
+    expected_processed_data = pd.DataFrame({
+        "item_id": ["1", "1", "2", "2", "3", "3"],
+        "date": pd.to_datetime([
+            "2023-10-01",
+            "2023-10-08",
+            "2023-10-01",
+            "2023-10-08",
+            "2023-10-01",
+            "2023-10-08",
+        ]),
+        "week_id": [0, 1, 0, 1, 0, 1],
+        "week_start": pd.to_datetime([
+            "2023-10-01",
+            "2023-10-08",
+            "2023-10-01",
+            "2023-10-08",
+            "2023-10-01",
+            "2023-10-08",
+        ]),
+        "time_period": ["test", "test", "test", "test", "test", "test"],
+        "treatment_assignment": [0, 0, 1, 1, 1, 1],
+        "clicks": [1.0, 2.0, 3.0, 0.0, 0.0, 0.0],
+        "impressions": [20.0, 21.0, 22.0, 0.0, 0.0, 0.0],
+        "conversions": [2.0, 3.0, 5.0, 0.0, 0.0, 0.0],
+        "total_conversion_value": [2.3, 4.2, 5.0, 0.0, 0.0, 0.0],
+        "total_cost": [1.0, 2.0, 3.0, 0.0, 0.0, 0.0],
+        "other_metric": [5.0, 2.0, 1.0, 0.0, 0.0, 0.0],
+    })
+    pd.testing.assert_frame_equal(
+        processed_data, expected_processed_data, check_like=True
+    )
+
+  @mock.patch("builtins.print")
+  def test_number_of_missing_item_ids_are_printed(self, mock_print):
+    treatment_assignment_data = pd.DataFrame(
+        {"Item ID": [1, 2, 3], "Assignment": [0, 1, 1]}
+    )  # Item ID 3 does not exist in the performance data
+    self.design.n_items_after_pre_trim = 3
+
+    data_preparation.prepare_and_validate_experiment_data(
+        daily_performance_data=self.performance_data,
+        treatment_assignment_data=treatment_assignment_data,
+        design=self.design,
+        experiment_start_date="2023-10-01",
+        item_id_column="Item ID",
+        date_column="YYYY-MM-DD",
+        treatment_assignment_column="Assignment",
+        clicks_column="Clicks",
+        impressions_column="Impr.",
+        conversions_column="Conv.",
+        total_conversion_value_column="Conv. Value",
+        total_cost_column="Cost",
+        other_metric_columns=["other_metric"],
+    )
+
+    mock_print.assert_any_call(
+        "WARNING: 1 / 3 (33.3333%) item ids from treatment_assignment_data do"
+        " not exist in the performance data. This could be because those items"
+        " don't exist anymore, or because they got 0 performance during the"
+        " test. All of the missing items will be filled with 0 for all metrics."
+        " If this seems reasonable then continue."
+    )
+
   def test_validate_experiment_data_is_called(self):
     with mock.patch(
         "feedx.data_preparation.validate_experiment_data",

@@ -1378,6 +1378,38 @@ def prepare_and_validate_experiment_data(
       "treatment_assignment"
   ].astype(int)
 
+  item_id_isin_performance = treatment_assignment_data["item_id"].isin(
+      daily_performance_data[item_id_column].values.astype(str)
+  )
+  missing_item_ids = treatment_assignment_data.loc[
+      ~item_id_isin_performance, ["item_id"]
+  ].drop_duplicates()
+
+  n_missing = len(missing_item_ids)
+  n_total = treatment_assignment_data["item_id"].nunique()
+  frac_missing = n_missing / n_total
+  if n_missing > 0:
+    print(
+        f"WARNING: {n_missing:,} / {n_total:,} ({frac_missing:.4%}) item ids"
+        " from treatment_assignment_data do not exist in the performance data."
+        " This could be because those items don't exist anymore, or because"
+        " they got 0 performance during the test. All of the missing items"
+        " will be filled with 0 for all metrics. If this seems reasonable then"
+        " continue."
+    )
+
+  # The missing item ids will be merged with the daily performance data
+  # to make it complete. To do this I need to assign a date. It doesn't matter
+  # which date because any missing dates will be filled with 0s later by
+  # fill_missing_rows_with_zeros(), it just has to be a date that exists
+  # in the performance data, so I just take the first one.
+  missing_item_ids["date"] = daily_performance_data[date_column].values[0]
+  missing_item_ids = standardize_column_names_and_types(
+      missing_item_ids,
+      item_id_column="item_id",
+      date_column="date",
+  )
+
   experiment_data = (
       daily_performance_data.copy()
       .pipe(
@@ -1391,6 +1423,7 @@ def prepare_and_validate_experiment_data(
           total_conversion_value_column=total_conversion_value_column,
           **extra_standardize_args,
       )
+      .merge(missing_item_ids, on=["item_id", "date"], how="outer")
       .pipe(fill_missing_rows_with_zeros)
       .pipe(
           add_week_id_and_week_start,
