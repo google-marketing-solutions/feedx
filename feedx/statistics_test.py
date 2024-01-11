@@ -1,4 +1,4 @@
-# Copyright 2023 Google LLC.
+# Copyright 2024 Google LLC.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+from unittest import mock
 
 from absl.testing import absltest
 from absl.testing import parameterized
@@ -37,6 +39,38 @@ class TrimmedArrayTest(parameterized.TestCase):
   def test_raises_exception_if_quantile_not_in_expected_range(self, quantile):
     with self.assertRaises(ValueError):
       statistics.TrimmedArray(self.input_array, quantile=quantile)
+
+  @mock.patch("builtins.print")
+  def test_warning_printed_if_any_input_array_is_constant(self, mock_print):
+    # If the array passed to the trimming is constant then the stats wont
+    # work well, so we print a warning for the user to check the data.
+    variable_input_array = np.array([5, 7, 8.5, 1, 9.5, 12, 20, 1, 2, 3])
+    constant_input_array = np.zeros_like(variable_input_array)
+    input_array = np.stack([variable_input_array, constant_input_array])
+
+    statistics.TrimmedArray(input_array, quantile=0.25)
+
+    mock_print.assert_any_call(
+        "WARNING: At least one of the arrays for trimming is constant. This"
+        " is unlikely to work well for any statistical calculations. Check"
+        " the data input."
+    )
+
+  @mock.patch("builtins.print")
+  def test_warning_printed_if_any_trimmed_array_is_constant(self, mock_print):
+    # If the array is constant after trimming, then we print a warning for the
+    # user to try a smaller trimming quantile.
+    variable_input_array = np.array([5, 7, 8.5, 1, 9.5, 12, 20, 1, 2, 3])
+    constant_input_array = np.zeros_like(variable_input_array)
+    constant_input_array[6] = 1.0
+    input_array = np.stack([variable_input_array, constant_input_array])
+
+    statistics.TrimmedArray(input_array, quantile=0.25)
+    mock_print.assert_any_call(
+        "WARNING: After trimming at least one of the arrays is constant. This"
+        " is unlikely to work well for any statistical calculations. Try a"
+        " smaller trimming quantile."
+    )
 
   def test_the_number_of_elements_to_trim_is_calculated_from_the_quantile(self):
     trimmed_array = statistics.TrimmedArray(

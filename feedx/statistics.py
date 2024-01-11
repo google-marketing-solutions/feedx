@@ -1,4 +1,4 @@
-# Copyright 2023 Google LLC.
+# Copyright 2024 Google LLC.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,6 +19,11 @@ import functools
 import numpy as np
 import numpy.typing as npt
 from scipy import stats
+
+
+def _any_array_is_constant(x: np.ndarray) -> bool:
+  """Returns True if any of the arrays are constant aross axis 1."""
+  return np.any(np.all(np.isclose(x, x[:, np.newaxis, 0]), axis=1))
 
 
 class TrimmedArray:
@@ -71,6 +76,19 @@ class TrimmedArray:
     self.quantile = quantile
 
     assert len(self) == self.original_sample_size - 2 * self.n_trim
+
+    if _any_array_is_constant(self._values_untrimmed):
+      print(
+          "WARNING: At least one of the arrays for trimming is constant. This"
+          " is unlikely to work well for any statistical calculations. Check"
+          " the data input."
+      )
+    elif _any_array_is_constant(self.values_trimmed):
+      print(
+          "WARNING: After trimming at least one of the arrays is constant. This"
+          " is unlikely to work well for any statistical calculations. Try a"
+          " smaller trimming quantile."
+      )
 
   @functools.cached_property
   def _is_2d(self) -> bool:
