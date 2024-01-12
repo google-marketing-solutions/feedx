@@ -239,13 +239,27 @@ We can validate this assumption with a simulation study. The simulations study r
 1. **Use a different metric.** If the above ideas don't work, you can try changing your metric. It could be that another metric will be better behaved.
 1. **Validate some other designs.** If none of the above options have worked, you can validate lots of your designs with the simulation studies and see if some of them pass. Perhaps doing so will reveal a pattern, where certain design parameters are making the validation checks fail, and you can then use this information to select better parameters.  
 
+#### Perform the treatment assignment
+
+Finally, if the validation checks pass, the items receive a random treatment assignment, which is either 0 or 1. What this means depends on if you are running a traditional (non-crossover) experiment, or a crossover experiment:
+
+##### Traditional (non-crossover) experiment treatment assignments
+
+* **Treatment Assignment = 0:** The item is in the control group and so should not receive the treatment.
+* **Treatment Assignment = 1:** The item is in the treatment group and so should receive the treatment.
+
+##### Crossover experiment treatment assignments
+
+* **Treatment Assignment = 0:** The item is in the "treat second" group, so should be treated in the second half of the experiment and not treated in the first half.
+* **Treatment Assignment = 1:** The item is in the "treat first" group, so should be treated in the first half of the experiment and not treated in the second half.
+
 #### Export the results
 
-Finally, if the validation checks pass, the experiment design is exported and the items are randomized into either control or treatment and exported. Store the selected experiment design and item assignment somewhere safe, they will be needed again for the next steps.
+The treatment assignment and the selected experiment design are exported and should be kept somewhere safe, they will both be needed again for the next steps.
 
 ### 2. Experiment Runtime
 
-Using the generated treatment assignment from the design step, create a [supplemental feed](https://support.google.com/merchants/answer/7439882?hl=en-GB&ref_topic=3163841&sjid=7770874677447797429-EU) for Shopping ads containing your feed optimisations only for the treatment items. When you are ready to start your experiment, upload this to Google Ads. If you are running a crossover experiment, then half way through the experiment you must create a new supplemental feed with the feed optimisations for the control items instead of the treatment items, and swap to that supplemental feed half way through the experiment runtime. 
+Using the generated treatment assignment from the design step, create a [supplemental feed](https://support.google.com/merchants/answer/7439882?hl=en-GB&ref_topic=3163841&sjid=7770874677447797429-EU) for Shopping ads containing your feed optimisations only for the treatment items (see [Perform the treatment assignment](#perform-the-treatment-assignment) to understand which items to use). When you are ready to start your experiment, upload this to Google Ads. If you are running a crossover experiment, then half way through the experiment you must create a new supplemental feed with the feed optimisations for the control items instead of the treatment items, and swap to that supplemental feed half way through the experiment runtime. 
 
 It is recommended to monitor the experiment throughout the experiment runtime, at least for the first few days after launching, and then at regular intervals. This can be done by running the analysis notebook with incomplete data. 
 
