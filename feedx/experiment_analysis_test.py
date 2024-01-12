@@ -436,7 +436,7 @@ class AnalyzeSingleMetricTests(parameterized.TestCase):
     pd.testing.assert_frame_equal(data, original_data_copy)
 
   @parameterized.parameters(False, True)
-  def test_analyze_single_metric_does_not_use_trimming_if_apply_trimming_if_in_design_is_false(
+  def test_analyze_single_metric_overrides_trimming_from_design_if_trimming_quantile_override_is_not_none(
       self, is_crossover
   ):
     data = pd.DataFrame({
@@ -462,12 +462,12 @@ class AnalyzeSingleMetricTests(parameterized.TestCase):
           data,
           design=design,
           metric_name="clicks",
-          apply_trimming_if_in_design=False,
+          trimming_quantile_override=0.05,
       )
       trimming_quantiles_used = set(
           [call[0][1] for call in mock_trimmed_array.call_args_list]
       )
-      self.assertSetEqual(trimming_quantiles_used, {0.0})
+      self.assertSetEqual(trimming_quantiles_used, {0.05})
 
 
 class AddTimePeriodColumnTests(parameterized.TestCase):
@@ -1135,7 +1135,9 @@ class ExperimentAnalysisTests(parameterized.TestCase):
         experiment_analysis.Metric(name="Clicks", column="clicks"),
         experiment_analysis.Metric(name="Impressions", column="impressions"),
         experiment_analysis.Metric(
-            name="Clicks (no trimm)", column="clicks", allow_trimming=False
+            name="Clicks (no trimm)",
+            column="clicks",
+            trimming_quantile_override=0.0,
         ),
         experiment_analysis.Metric(
             name="CTR", column="clicks", denominator_column="impressions"
@@ -1144,7 +1146,7 @@ class ExperimentAnalysisTests(parameterized.TestCase):
             name="CTR (no trim)",
             column="clicks",
             denominator_column="impressions",
-            allow_trimming=False,
+            trimming_quantile_override=0.0,
         ),
     ]
 
@@ -1250,7 +1252,9 @@ class ExperimentAnalysisTests(parameterized.TestCase):
         experiment_analysis.Metric(name="Clicks", column="clicks"),
         experiment_analysis.Metric(name="Impressions", column="impressions"),
         experiment_analysis.Metric(
-            name="Clicks (no trimm)", column="clicks", allow_trimming=False
+            name="Clicks (no trimm)",
+            column="clicks",
+            trimming_quantile_override=0.0,
         ),
         experiment_analysis.Metric(
             name="CTR", column="clicks", denominator_column="impressions"
@@ -1259,7 +1263,7 @@ class ExperimentAnalysisTests(parameterized.TestCase):
             name="CTR (no trim)",
             column="clicks",
             denominator_column="impressions",
-            allow_trimming=False,
+            trimming_quantile_override=0.0,
         ),
     ]
 
@@ -1379,7 +1383,9 @@ class ExperimentAnalysisTests(parameterized.TestCase):
         experiment_analysis.Metric(name="Clicks", column="clicks"),
         experiment_analysis.Metric(name="Impressions", column="impressions"),
         experiment_analysis.Metric(
-            name="Clicks (no trimm)", column="clicks", allow_trimming=False
+            name="Clicks (no trimm)",
+            column="clicks",
+            trimming_quantile_override=0.0,
         ),
         experiment_analysis.Metric(
             name="CTR", column="clicks", denominator_column="impressions"
@@ -1388,7 +1394,7 @@ class ExperimentAnalysisTests(parameterized.TestCase):
             name="CTR (no trim)",
             column="clicks",
             denominator_column="impressions",
-            allow_trimming=False,
+            trimming_quantile_override=0.0,
         ),
     ]
 

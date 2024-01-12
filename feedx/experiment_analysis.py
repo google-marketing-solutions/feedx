@@ -646,7 +646,7 @@ def analyze_single_metric(
     metric_name: str,
     denominator_metric_name: str | None = None,
     treatment_assignment_index_name: str = "treatment_assignment",
-    apply_trimming_if_in_design: bool = True,
+    trimming_quantile_override: float | None = None,
 ) -> statistics.StatisticalTestResults:
   """Analyzes an A/B test.
 
@@ -688,8 +688,11 @@ def analyze_single_metric(
       regular, non-ratio metric.
     treatment_assignment_index_name: The name of the index level containing the
       treatment assignment in the data. Defaults to "treatment_assignment".
-    apply_trimming_if_in_design: Whether to apply the trimming if it is
-      specified in the design. Defaults to True.
+    trimming_quantile_override: If None, apply the trimming that is specified in
+      the experiment design. Otherwise, use this as the trimming quantile for
+      this metric. The trimming quantile from the design should always be used
+      for the primary metric, as that is how the experiment was designed, but
+      for other metrics it can be set to something different. Defaults to None.
 
   Returns:
     The statistical test results.
@@ -724,10 +727,10 @@ def analyze_single_metric(
         f"{missing_columns}"
     )
 
-  if apply_trimming_if_in_design:
+  if trimming_quantile_override is None:
     post_trim_percentile = design.post_trim_percentile
   else:
-    post_trim_percentile = 0.0
+    post_trim_percentile = trimming_quantile_override
 
   if design.is_crossover:
     return _analyze_crossover_experiment_single_metric(
@@ -755,15 +758,17 @@ class Metric:
     denominator_column: If the metric is a ratio (e.g. CTR) then this is the
       column name containing the denominator of the metric, and the column
       attribute contains the numerator. Defaults to None.
-    allow_trimming: True if trimming should be applied, given it is included in
-      the experiment design. Set to False for metrics that should not need
-      trimming, for example binomial metrics. Defaults to True.
+    trimming_quantile_override: If None, apply the trimming that is specified in
+      the experiment design. Otherwise, use this as the trimming quantile for
+      this metric. The trimming quantile from the design should always be used
+      for the primary metric, as that is how the experiment was designed, but
+      for other metrics it can be set to something different. Defaults to None.
   """
 
   name: str
   column: str
   denominator_column: str | None = None
-  allow_trimming: bool = True
+  trimming_quantile_override: float | None = None
 
 
 def analyze_experiment(
@@ -812,13 +817,14 @@ def analyze_experiment(
 
   results_list = []
   for metric in tqdm.tqdm(metrics):
+    print(f"Analysing {metric.name}")
     result = analyze_single_metric(
         pivoted_data,
         design=design,
         metric_name=metric.column,
         denominator_metric_name=metric.denominator_column,
         treatment_assignment_index_name=treatment_assignment_column,
-        apply_trimming_if_in_design=metric.allow_trimming,
+        trimming_quantile_override=metric.trimming_quantile_override,
     )
     result_dict = dataclasses.asdict(result)
     result_dict["metric"] = metric.name
