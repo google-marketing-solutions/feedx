@@ -2,6 +2,11 @@
 
 # FeedX: Transparent, robust and trustworthy A/B experimentation for Shopping feeds
 
+[![GitHub last commit](https://img.shields.io/github/last-commit/google/feedx)](https://github.com/google/feedx/commits)
+[![Code Style: Google](https://img.shields.io/badge/code%20style-google-blueviolet.svg)](https://google.github.io/styleguide/pyguide.html)
+[![Open in Colab](https://img.shields.io/badge/Experiment_Design_Colab-blue?style=flat&logo=google%20colab&labelColor=grey)](https://colab.research.google.com/github/google/feedx/blob/main/notebooks/01_experiment_designer.ipynb)
+[![Open in Colab](https://img.shields.io/badge/Experiment_Analysis_Colab-blue?style=flat&logo=google%20colab&labelColor=grey)](https://colab.research.google.com/github/google/feedx/blob/main/notebooks/02_experiment_analyzer.ipynb)
+
 **Disclaimer: This is not an official Google product.**
 
 [Overview](#overview) •
@@ -30,8 +35,8 @@ FeedX is the recommended testing methodology for [FeedGen](https://github.com/go
 
 The easiest way to get started with FeedX is with Google Colab. FeedX has two Colab notebooks:
 
-* **01_experiment_designer.ipynb:** Containing all the logic for designing a new experiment.
-* **02_experiment_analyzer.ipynb:** Containing all the logic for analyzing an in progress or concluded experiment.
+* **01_experiment_designer.ipynb:** Containing all the logic for designing a new experiment. Open in [Colab](https://colab.research.google.com/github/google/feedx/blob/main/notebooks/01_experiment_designer.ipynb) or view in [Github](https://github.com/google/feedx/blob/main/notebooks/01_experiment_designer.ipynb).
+* **02_experiment_analyzer.ipynb:** Containing all the logic for analyzing an in progress or concluded experiment. Open in [Colab](https://colab.research.google.com/github/google/feedx/blob/main/notebooks/02_experiment_analyzer.ipynb) or view in [Github](https://github.com/google/feedx/blob/main/notebooks/02_experiment_analyzer.ipynb).
 
 Just open the relevant notebook, save a copy into your Google Drive, and start from there.
 
