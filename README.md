@@ -370,7 +370,7 @@ This happens because FeedX randomizes items, and those items might cannibalize f
 
 We don’t have a way to quantify the magnitude of this effect size inflation, but since it is just inflating the size of the effect, if the main goal of the test is to understand directionality (is A better than B?) then it shouldn’t matter. It’s just good to know that the measured effect size will be a bit bigger than the real one. Typically this rules out using FeedX in cases where the effect size matters, for example experimenting with price changes where the change in price needs to be offset by a large enough change in demand to ensure a positive impact on profit.
 
-Spillover can be mitigated by performing cluster randomisation, where groups of similar items are randomized together [1]. This is something we are working on integrating into FeedX.
+Spillover can be mitigated by performing cluster randomisation, where groups of similar items are randomized together [[1]](#1). This is something we are working on integrating into FeedX.
 
 ## References
 
