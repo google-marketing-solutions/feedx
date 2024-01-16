@@ -14,7 +14,7 @@
 
 """Tests for plotting."""
 
-from unittest import mock
+import dataclasses
 
 from absl.testing import absltest
 from absl.testing import parameterized
@@ -70,6 +70,52 @@ class PlotMetricHistoryTest(parameterized.TestCase):
     ax = plotting.plot_metric_history(self.plot_data, "impressions")
     self.assertIsInstance(ax[0], plt.Axes)
     self.assertIsInstance(ax[1], plt.Axes)
+
+
+@dataclasses.dataclass
+class MockSimulationAnalysis:
+  minimum_detectable_effect: float | None
+  aa_simulation_results: pd.DataFrame | None
+  ab_simulation_results: pd.DataFrame | None
+  simulated_false_positive_rate: float | None
+
+
+class PlotDeepDiveTest(parameterized.TestCase):
+
+  def setUp(self):
+    super().setUp()
+    aa_simulation_results = pd.DataFrame({
+        "p_value": np.random.rand(1000),
+        "absolute_difference": np.random.randn(1000),
+    })
+    ab_simulation_results = pd.DataFrame({
+        "p_value": np.random.rand(1000),
+        "absolute_difference": np.random.randn(1000) + 0.5,
+    })
+    self.analysis_results = MockSimulationAnalysis(
+        0.5, aa_simulation_results, ab_simulation_results, 0.05)
+    self.analysis_results_none = MockSimulationAnalysis(
+        0.5, aa_simulation_results, ab_simulation_results, None)
+
+  def test_plot_deep_dive_returns_array(self):
+    ax = plotting.plot_deep_dive(self.analysis_results)
+    self.assertIsInstance(ax, np.ndarray)
+
+  def test_plot_deep_dive_returns_3_axes(self):
+    ax = plotting.plot_deep_dive(self.analysis_results)
+    self.assertTupleEqual(ax.shape, (3,))
+
+  def test_plot_deep_dive_returns_array_of_axes(self):
+    ax = plotting.plot_deep_dive(self.analysis_results)
+    self.assertIsInstance(ax[0], plt.Axes)
+    self.assertIsInstance(ax[1], plt.Axes)
+    self.assertIsInstance(ax[2], plt.Axes)
+
+  def test_raises_exception_if_simulation_not_run(self):
+    with self.assertRaises(ValueError):
+      plotting.plot_deep_dive(
+          self.analysis_results_none
+      )
 
 
 if __name__ == "__main__":
