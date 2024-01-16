@@ -372,6 +372,20 @@ We don’t have a way to quantify the magnitude of this effect size inflation, b
 
 Spillover can be mitigated by performing cluster randomisation, where groups of similar items are randomized together [[1]](#1). This is something we are working on integrating into FeedX.
 
+## Citing FeedX
+
+To cite this repository:
+
+```
+@software{feedx_github,
+  author = {Sam Bailey and Amanda Rodriguez},
+  title = {FeedX: Transparent, robust and trustworthy A/B experimentation for Shopping feeds},
+  url = {https://github.com/google/feedx},
+  version = {0.0.1},
+  year = {2024},
+}
+```
+
 ## References
 
 <a id="1">[1]</a> 
