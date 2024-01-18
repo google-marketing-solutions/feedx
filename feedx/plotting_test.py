@@ -93,9 +93,11 @@ class PlotDeepDiveTest(parameterized.TestCase):
         "absolute_difference": np.random.randn(1000) + 0.5,
     })
     self.analysis_results = MockSimulationAnalysis(
-        0.5, aa_simulation_results, ab_simulation_results, 0.05)
+        0.5, aa_simulation_results, ab_simulation_results, 0.05
+    )
     self.analysis_results_none = MockSimulationAnalysis(
-        0.5, aa_simulation_results, ab_simulation_results, None)
+        0.5, aa_simulation_results, ab_simulation_results, None
+    )
 
   def test_plot_deep_dive_returns_array(self):
     ax = plotting.plot_deep_dive(self.analysis_results)
@@ -113,8 +115,94 @@ class PlotDeepDiveTest(parameterized.TestCase):
 
   def test_raises_exception_if_simulation_not_run(self):
     with self.assertRaises(ValueError):
-      plotting.plot_deep_dive(
-          self.analysis_results_none
+      plotting.plot_deep_dive(self.analysis_results_none)
+
+
+class AddCupedAdjustedMetricPerDateTest(parameterized.TestCase):
+
+  def setUp(self):
+    super().setUp()
+    self.mock_data = pd.DataFrame(
+        data={
+            "item_id": ["A", "A", "A", "B", "B", "B", "C", "C", "C"],
+            "date": [
+                "2024-01-01",
+                "2024-01-02",
+                "2024-01-03",
+                "2024-01-01",
+                "2024-01-02",
+                "2024-01-03",
+                "2024-01-01",
+                "2024-01-02",
+                "2024-01-03",
+            ],
+            "time_period": [
+                "pretest",
+                "test",
+                "test",
+                "pretest",
+                "test",
+                "test",
+                "pretest",
+                "test",
+                "test",
+            ],
+            "metric": [25, 26, 17, 28, 27, 29, 17, 28, 16],
+        }
+    )
+
+  def test_cuped_adjustment(self):
+    result_data = plotting._add_cuped_adjusted_metric_per_date(
+        self.mock_data, "metric", "item_id", "date", "time_period"
+    )
+
+    expected_data = pd.DataFrame(
+        data={
+            "item_id": ["A", "A", "A", "B", "B", "B", "C", "C", "C"],
+            "date": [
+                "2024-01-01",
+                "2024-01-02",
+                "2024-01-03",
+                "2024-01-01",
+                "2024-01-02",
+                "2024-01-03",
+                "2024-01-01",
+                "2024-01-02",
+                "2024-01-03",
+            ],
+            "time_period": [
+                "pretest",
+                "test",
+                "test",
+                "pretest",
+                "test",
+                "test",
+                "pretest",
+                "test",
+                "test",
+            ],
+            "metric": [25, 26, 17, 28, 27, 29, 17, 28, 16],
+            "metric_cuped_adjusted": [
+                23.333333,
+                26.206186,
+                15.393471,
+                23.333333,
+                27.57732,
+                24.501718,
+                23.333333,
+                27.216495,
+                22.104811,
+            ],
+        }
+    )
+    pd.testing.assert_frame_equal(result_data, expected_data)
+
+  def test_raises_exception_if_no_pretest_data(self):
+    self.mock_data["time_period"] = "test"
+
+    with self.assertRaises(ValueError):
+      plotting._add_cuped_adjusted_metric_per_date(
+          self.mock_data, "metric", "item_id", "date", "time_period"
       )
 
 

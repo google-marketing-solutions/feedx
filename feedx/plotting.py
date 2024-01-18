@@ -19,6 +19,7 @@ import numpy as np
 import pandas as pd
 
 from feedx import experiment_simulations
+from feedx import statistics
 
 
 def _make_density_plot(
@@ -199,3 +200,57 @@ def plot_deep_dive(
   )
 
   return ax
+
+
+def _add_cuped_adjusted_metric_per_date(
+    data: pd.DataFrame,
+    metric_column: str,
+    item_id_column: str,
+    date_column: str,
+    time_period_column: str,
+    new_metric_column_name: str | None = None,
+) -> pd.DataFrame:
+  """Calculates the CUPED-adjusted values of the given metric per item.
+
+  Args:
+    data: the input data to analyze
+    metric_column: name of the column with the metric to adjust
+    item_id_column: name of the column with the item_ids
+    date_column: name of the column containing dates
+    time_period_column: name of the column containing the test phases, eg
+      "pretest", "test_1", "washout_1"
+    new_metric_column_name: optional; name of the column of the adjusted metric.
+      If it is None, then it will default to the name of the metric column with
+      "_cuped_adjusted" appended to it
+
+  Returns:
+    Modified data frame with CUPED adjusted metric
+  """
+  new_metric_column_name = (
+      new_metric_column_name or f"{metric_column}_cuped_adjusted"
+  )
+  if "pretest" not in data[time_period_column].values:
+    raise ValueError(
+        "CUPED adjustment can only be done with pretest data. Please make sure"
+        " to provide pretest data"
+    )
+
+  pretest_mask = data[time_period_column] == "pretest"
+  pretest_values = (
+      data.loc[pretest_mask].groupby(item_id_column)[metric_column].sum()
+  )
+  covariate = data[item_id_column].map(pretest_values)
+  raw_metric = data[metric_column].copy()
+
+  data[new_metric_column_name] = np.empty(len(data), dtype=np.float64)
+  for date in data[date_column].drop_duplicates().values:
+    date_mask = data[date_column] == date
+    data.loc[date_mask, new_metric_column_name] = (
+        statistics.apply_cuped_adjustment(
+            raw_metric.loc[date_mask].values,
+            covariate.loc[date_mask].values,
+            0.0,
+        )
+    )
+
+  return data
