@@ -20,6 +20,7 @@ FeedX.
 
 from collections.abc import Collection
 import datetime as dt
+import enum
 from typing import Callable
 
 import numpy as np
@@ -29,6 +30,22 @@ from scipy import stats
 
 from feedx import experiment_analysis
 from feedx import experiment_design
+
+
+class ValidationChecks(enum.Enum):
+  """Names of the validation checks applied to the data."""
+
+  NO_NULLS = "no_nulls"
+  NO_DUPLICATE_ITEMS_PER_DATE = "no_duplicate_items_per_date"
+  WEEKLY_OR_DAILY_DATES = "weekly_or_daily_dates"
+  CONSECUTIVE_WEEK_IDS = "consecutive_week_ids"
+  FINITE_METRICS = "finite_metrics"
+  POSITIVE_METRICS = "positive_metrics"
+  NUMBER_OF_ITEMS_MATCH_DESIGN = "number_of_items_matches_design"
+  EXPERIMENT_DATES_MATCH_DESIGN = "experiment_dates_match"
+  TREATMENT_ASSIGNMENT_IS_UNIQUE = "treatment_assignment_is_unique"
+  COINFLIP_SALT_VALIDATION = "coinflip_salt_validation"
+  NO_SAMPLE_RATIO_MISMATCH = "no_sample_ratio_mismatch"
 
 
 def _sample_from_lognormal(
@@ -1023,7 +1040,7 @@ def validate_experiment_data(
     experiment_start_date: str,
     experiment_has_concluded: bool = True,
     can_be_negative_metric_columns: Collection[str] | None = None,
-    skip_coinflip_salt_validation: bool = False,
+    skip_validation_checks: list[ValidationChecks | str] | None = None,
 ) -> None:
   """Runs all the required validation for the experiment data.
 
@@ -1065,74 +1082,100 @@ def validate_experiment_data(
       runtime)? Defaults to True.
     can_be_negative_metric_columns: The list of metric columns that are allowed
       to be negative. Defaults to None, meaning all metrics must be positive.
-    skip_coinflip_salt_validation: If true, the coinflip salt validation is not
-      performed. This is used if the splitting was not done with the design
-      notebook.
+    skip_validation_checks: The list of validation checks to be skipped. Defaults
+      to None which doesn't skip any steps.
 
   Raises:
     ValueError: If any of the validations fail.
   """
+  skip_validation_checks = list(
+      map(ValidationChecks, skip_validation_checks or [])
+  )
+
   if design.primary_metric not in metric_columns:
     raise ValueError(
         f"The primary metric {design.primary_metric} must be one of the"
         " metric_columns."
     )
 
-  _validate_no_null_values(experiment_data)
-  _validate_every_value_exists_exactly_once_for_every_group(
-      experiment_data,
-      group_column=date_column,
-      value_column=item_id_column,
-  )
-  _validate_dates_are_either_daily_or_weekly(
-      experiment_data,
-      date_column=date_column,
-  )
-  _validate_week_ids_are_consecutive_integers(experiment_data, week_id_column)
-  _validate_all_metrics_are_finite(
-      experiment_data, metric_columns=metric_columns
-  )
+  if ValidationChecks.NO_NULLS not in skip_validation_checks:
+    _validate_no_null_values(experiment_data)
 
-  can_be_negative_metric_columns = can_be_negative_metric_columns or []
-  require_non_negative_metric_columns = [
-      metric_column
-      for metric_column in metric_columns
-      if metric_column not in can_be_negative_metric_columns
-  ]
-  if require_non_negative_metric_columns:
-    _validate_all_metrics_are_positive(
+  if ValidationChecks.NO_DUPLICATE_ITEMS_PER_DATE not in skip_validation_checks:
+    _validate_every_value_exists_exactly_once_for_every_group(
         experiment_data,
-        metric_columns=require_non_negative_metric_columns,
-        required=True,
-    )
-  if can_be_negative_metric_columns:
-    _validate_all_metrics_are_positive(
-        experiment_data,
-        metric_columns=can_be_negative_metric_columns,
-        required=False,
+        group_column=date_column,
+        value_column=item_id_column,
     )
 
-  _validate_number_of_items_matches_design(
-      experiment_data, design, item_id_column
-  )
-  _validate_experiment_dates_match(
-      experiment_data,
-      design=design,
-      date_column=date_column,
-      experiment_start_date=experiment_start_date,
-      experiment_has_concluded=experiment_has_concluded,
-  )
+  if ValidationChecks.WEEKLY_OR_DAILY_DATES not in skip_validation_checks:
+    _validate_dates_are_either_daily_or_weekly(
+        experiment_data,
+        date_column=date_column,
+    )
 
-  _validate_treatment_assignment_is_unique_for_each_item_id(
-      experiment_data, item_id_column, treatment_assignment_column
-  )
-  if not skip_coinflip_salt_validation:
+  if ValidationChecks.CONSECUTIVE_WEEK_IDS not in skip_validation_checks:
+    _validate_week_ids_are_consecutive_integers(experiment_data, week_id_column)
+
+  if ValidationChecks.FINITE_METRICS not in skip_validation_checks:
+    _validate_all_metrics_are_finite(
+        experiment_data, metric_columns=metric_columns
+    )
+
+  if ValidationChecks.POSITIVE_METRICS not in skip_validation_checks:
+    can_be_negative_metric_columns = can_be_negative_metric_columns or []
+    require_non_negative_metric_columns = [
+        metric_column
+        for metric_column in metric_columns
+        if metric_column not in can_be_negative_metric_columns
+    ]
+    if require_non_negative_metric_columns:
+      _validate_all_metrics_are_positive(
+          experiment_data,
+          metric_columns=require_non_negative_metric_columns,
+          required=True,
+      )
+    if can_be_negative_metric_columns:
+      _validate_all_metrics_are_positive(
+          experiment_data,
+          metric_columns=can_be_negative_metric_columns,
+          required=False,
+      )
+
+  if ValidationChecks.NUMBER_OF_ITEMS_MATCH_DESIGN not in skip_validation_checks:
+    _validate_number_of_items_matches_design(
+        experiment_data, design, item_id_column
+    )
+
+  if (
+      ValidationChecks.EXPERIMENT_DATES_MATCH_DESIGN
+      not in skip_validation_checks
+  ):
+    _validate_experiment_dates_match(
+        experiment_data,
+        design=design,
+        date_column=date_column,
+        experiment_start_date=experiment_start_date,
+        experiment_has_concluded=experiment_has_concluded,
+    )
+
+  if (
+      ValidationChecks.TREATMENT_ASSIGNMENT_IS_UNIQUE
+      not in skip_validation_checks
+  ):
+    _validate_treatment_assignment_is_unique_for_each_item_id(
+        experiment_data, item_id_column, treatment_assignment_column
+    )
+
+  if ValidationChecks.COINFLIP_SALT_VALIDATION not in skip_validation_checks:
     _validate_coinflip_matches_assignments(
         experiment_data, design, treatment_assignment_column, item_id_column
     )
-  validate_no_sample_ratio_mismatch(
-      experiment_data, item_id_column, treatment_assignment_column
-  )
+
+  if ValidationChecks.NO_SAMPLE_RATIO_MISMATCH not in skip_validation_checks:
+    validate_no_sample_ratio_mismatch(
+        experiment_data, item_id_column, treatment_assignment_column
+    )
 
 
 def add_at_least_one_metrics(
@@ -1288,7 +1331,7 @@ def prepare_and_validate_experiment_data(
     can_be_negative_metric_columns: list[str] | None = None,
     at_least_one_metrics: dict[str, str] | None = None,
     experiment_has_concluded: bool = True,
-    skip_coinflip_salt_validation: bool = False,
+    skip_validation_checks: list[ValidationChecks | str] | None = None,
 ) -> pd.DataFrame:
   """Prepares and validates the experiment data for the experiment analysis.
 
@@ -1332,9 +1375,8 @@ def prepare_and_validate_experiment_data(
       "at_least_one_click"}. If not adding any at least one metrics, set to
       None. Defaults to None.
     experiment_has_concluded: Has the experiment finished? Defaults to True.
-    skip_coinflip_salt_validation: If true, the coinflip salt validation is not
-      performed. This is used if the splitting was not done with the design
-      notebook.
+    skip_validation_checks: The list of validation checks to be skipped. Defaults
+      to None which doesn't skip any steps.
 
   Returns:
     The processed data.
@@ -1451,7 +1493,7 @@ def prepare_and_validate_experiment_data(
       metric_columns=metric_columns,
       can_be_negative_metric_columns=can_be_negative_metric_columns,
       experiment_has_concluded=experiment_has_concluded,
-      skip_coinflip_salt_validation=skip_coinflip_salt_validation,
+      skip_validation_checks=skip_validation_checks,
   )
 
   return experiment_data

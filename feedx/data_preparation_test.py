@@ -1228,7 +1228,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
       )
 
   @mock_experiment_design_validation
-  def test_coinflip_salt_not_checked_if_skip_coinflip_salt_validation_is_true(
+  def test_coinflip_salt_not_checked_if_included_in_skip_validation_checks(
       self, mock_experiment_design
   ):
     experiment_data = pd.DataFrame({
@@ -1257,7 +1257,9 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         metric_columns=["clicks", "impressions"],
         experiment_start_date="2023-10-01",
         treatment_assignment_column="treatment_assignment",
-        skip_coinflip_salt_validation=True,
+        skip_validation_checks=[
+            data_preparation.ValidationChecks.COINFLIP_SALT_VALIDATION
+        ],
     )
 
   @mock_experiment_design_validation
