@@ -2,7 +2,7 @@
 
 # FeedX: Transparent, robust and trustworthy A/B experimentation for Shopping feeds
 
-[![python](https://img.shields.io/badge/Python-3.10-3776AB.svg?style=flat&logo=python&logoColor=white)](https://www.python.org)
+[![python](https://img.shields.io/badge/Python->=3.10-3776AB.svg?style=flat&logo=python&logoColor=white)](https://www.python.org)
 [![PyPI](https://img.shields.io/pypi/v/feedx?logo=pypi&logoColor=white&style=flat)](https://pypi.org/project/feedx/)
 [![GitHub last commit](https://img.shields.io/github/last-commit/google-marketing-solutions/feedx)](https://github.com/google-marketing-solutions/feedx/commits)
 [![Code Style: Google](https://img.shields.io/badge/code%20style-google-blueviolet.svg)](https://google.github.io/styleguide/pyguide.html)
