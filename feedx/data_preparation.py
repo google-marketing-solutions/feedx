@@ -20,7 +20,7 @@ FeedX.
 
 from collections.abc import Collection
 import datetime as dt
-import enum
+import functools
 from typing import Callable
 
 import numpy as np
@@ -32,20 +32,60 @@ from feedx import experiment_analysis
 from feedx import experiment_design
 
 
-class ValidationChecks(enum.Enum):
-  """Names of the validation checks applied to the data."""
+class ValidationChecks:
+  """Wraps validation checks and implements logic for skipping them."""
 
-  NO_NULLS = "no_nulls"
-  NO_DUPLICATE_ITEMS_PER_DATE = "no_duplicate_items_per_date"
-  WEEKLY_OR_DAILY_DATES = "weekly_or_daily_dates"
-  CONSECUTIVE_WEEK_IDS = "consecutive_week_ids"
-  FINITE_METRICS = "finite_metrics"
-  POSITIVE_METRICS = "positive_metrics"
-  NUMBER_OF_ITEMS_MATCH_DESIGN = "number_of_items_matches_design"
-  EXPERIMENT_DATES_MATCH_DESIGN = "experiment_dates_match"
-  TREATMENT_ASSIGNMENT_IS_UNIQUE = "treatment_assignment_is_unique"
-  COINFLIP_SALT_VALIDATION = "coinflip_salt_validation"
-  NO_SAMPLE_RATIO_MISMATCH = "no_sample_ratio_mismatch"
+  _CHECKS = set()
+
+  @classmethod
+  def add_check(cls, check_name: str) -> Callable:
+    """Adds a validation check to the list of available checks.
+
+    It also wraps the check in the logic to allow it to fail, based on the
+    skip_validation_checks.
+
+    Args:
+      check_name: The name of the check. This is the name that can be added to
+        the skip_validation_checks to allow this check to fail.
+
+    Returns:
+      A decorator for the validation function.
+    """
+
+    def _add_check(check: Callable) -> Callable:
+      cls._CHECKS.add(check_name)
+
+      @functools.wraps(check)
+      def _check(
+          *args, skip_validation_checks: list[str] | None = None, **kwargs
+      ) -> None:
+        failure, message = check(*args, **kwargs)
+        skip_validation_checks = skip_validation_checks or []
+        if not failure:
+          print(f"Validation check '{check_name}' passed. {message}")
+          return
+
+        if check_name in skip_validation_checks:
+          print(
+              f"WARNING: Validation check '{check_name}' failed, but was"
+              f" skipped. {message}"
+          )
+          return
+
+        raise ValueError(f"Validation check '{check_name}' failed. {message}")
+
+      return _check
+
+    return _add_check
+
+  @classmethod
+  def assert_check_exists(cls, check_name: str) -> None:
+    """Raises an error if the check is not found."""
+    if check_name not in cls._CHECKS:
+      raise ValueError(
+          f"The validation check '{check_name}' not found. Available checks are"
+          f" {cls._CHECKS}."
+      )
 
 
 def _sample_from_lognormal(
@@ -679,64 +719,72 @@ def group_data_to_complete_weeks(
   return data_copy
 
 
-def _validate_every_value_exists_exactly_once_for_every_group(
+@ValidationChecks.add_check("no_duplicate_items_per_date")
+def _validate_every_item_exists_exactly_once_for_every_date(
     data: pd.DataFrame,
     *,
-    value_column: str,
-    group_column: str,
-) -> None:
+    item_id_column: str,
+    date_column: str,
+) -> tuple[bool, str]:
   """Validates that every value exists exactly once in every group."""
   value_counts_per_group = (
-      data[[group_column, value_column]]
-      .groupby(group_column)
-      .count()[value_column]
+      data[[date_column, item_id_column]]
+      .groupby(date_column)
+      .count()[item_id_column]
   )
 
   unique_value_counts_per_group = (
-      data[[group_column, value_column]]
-      .groupby(group_column)
-      .nunique()[value_column]
+      data[[date_column, item_id_column]]
+      .groupby(date_column)
+      .nunique()[item_id_column]
   )
 
   if np.any(value_counts_per_group != unique_value_counts_per_group):
     bad_groups = value_counts_per_group.loc[
         value_counts_per_group != unique_value_counts_per_group
     ].index.values
-    raise ValueError(
-        f"There are duplicate {value_column} when {group_column} in "
-        f"{bad_groups}"
+    message = (
+        f"There are duplicate {item_id_column} when {date_column} in "
+        f"{bad_groups}."
     )
+    failed = True
+    return failed, message
 
   value_counts_first_group = value_counts_per_group.values[0]
   if np.any(value_counts_per_group.values != value_counts_first_group):
-    raise ValueError(
-        f"Some {group_column} are missing {value_column}. Below are the number "
-        f"of unique {value_column} per {group_column}, which should be equal "
-        f"for all dates.\n{value_counts_per_group}"
+    message = (
+        f"Some {date_column} are missing {item_id_column}. Below are the number"
+        f" of unique {item_id_column} per {date_column}, which should be equal"
+        f" for all dates.\n{value_counts_per_group}\n"
     )
-  else:
-    print(
-        f"All {group_column} have {value_counts_first_group:,} {value_column},"
-        " check passed."
-    )
+    failed = True
+    return failed, message
+
+  message = (
+      f"All {date_column} have {value_counts_first_group:,} {item_id_column}."
+  )
+  failed = False
+  return failed, message
 
 
-def _validate_no_null_values(data: pd.DataFrame) -> None:
+@ValidationChecks.add_check("no_nulls")
+def _validate_no_null_values(data: pd.DataFrame) -> tuple[bool, str]:
   """Validates that there are no null or n/a values in the data."""
-  nulls = data.isnull().sum()
+  nulls = data.isnull().sum() + data.isna().sum()
   if np.any(nulls.values > 0):
-    raise ValueError(f"Nulls found in data:\n{nulls}")
+    message = f"Nulls found in data:\n{nulls}\n"
+    failed = True
+    return failed, message
 
-  nas = data.isna().sum()
-  if np.any(nas.values > 0):
-    raise ValueError(f"N/As found in data:\n{nas}")
-
-  print("No nulls check passed.")
+  failed = False
+  return failed, ""
 
 
+@ValidationChecks.add_check("dates_are_daily_or_weekly")
 def _validate_dates_are_either_daily_or_weekly(
-    data: pd.DataFrame, date_column: str
-) -> None:
+    data: pd.DataFrame,
+    date_column: str,
+) -> tuple[bool, str]:
   """Validates that dates are daily or weekly spaced."""
   if not pd.api.types.is_datetime64_any_dtype(data[date_column]):
     raise ValueError(
@@ -749,104 +797,128 @@ def _validate_dates_are_either_daily_or_weekly(
   )
 
   if np.all(days_between_dates == 7):
-    print("Dates are weekly, check passed.")
+    failed = False
+    return failed, "Dates are weekly."
   elif np.all(days_between_dates == 1):
-    print("Dates are daily, check passed.")
+    failed = False
+    return failed, "Dates are daily."
   else:
-    raise ValueError(
-        "Dates and neither consistently weekly spaced or consistently daily"
-        " spaced, check failed."
+    message = (
+        "Dates are neither consistently weekly spaced or consistently daily"
+        " spaced."
     )
+    failed = True
+    return failed, message
 
 
+@ValidationChecks.add_check("week_ids_are_consecutive_integers")
 def _validate_week_ids_are_consecutive_integers(
-    data: pd.DataFrame, week_id_column: str
-) -> None:
+    data: pd.DataFrame,
+    week_id_column: str,
+    date_column: str,
+) -> tuple[bool, str]:
   """Validates that the week_id is an array on consecutive integers."""
   if not pd.api.types.is_integer_dtype(data[week_id_column]):
     raise ValueError(
         f"week_id column must be an integer, got {data[week_id_column].dtype}."
     )
 
-  unique_week_ids = data[week_id_column].drop_duplicates().sort_values()
-  gap_between_week_ids = (
-      (unique_week_ids - unique_week_ids.shift(1)).iloc[1:].values
+  unique_date_ids = (
+      data[[week_id_column, date_column]]
+      .drop_duplicates()
+      .sort_values(date_column)[week_id_column]
   )
-  if not np.all(gap_between_week_ids == 1):
-    raise ValueError("Date ids are not consecituve, there is a gap.")
+  gap_between_date_ids = (
+      (unique_date_ids - unique_date_ids.shift(1)).iloc[1:].values
+  )
+  zero_day_gap = gap_between_date_ids == 0
+  one_day_gap = gap_between_date_ids == 1
+  if not np.all(one_day_gap | zero_day_gap):
+    message = "Week ids are not consecituve, there is a gap."
+    failed = True
+    return failed, message
 
-  print("Date ids are consecutive integers, check passed.")
+  message = "Week ids are consecutive integers."
+  failed = False
+  return failed, message
 
 
+@ValidationChecks.add_check("all_metrics_are_finite")
 def _validate_all_metrics_are_finite(
-    data: pd.DataFrame, metric_columns: Collection[str]
-) -> None:
+    data: pd.DataFrame,
+    metric_columns: Collection[str],
+) -> tuple[bool, str]:
   """Validates that all the metrics are finite."""
   for metric_column in metric_columns:
     invalid_metric_count = (~np.isfinite(data[metric_column].values)).sum()
 
     if invalid_metric_count:
-      raise ValueError(
+      message = (
           f"There are {invalid_metric_count} non-finite values in"
           f" {metric_column}. "
       )
+      failed = True
+      return failed, message
 
-  print(
-      f"The following metric values are all finite: {metric_columns}, check"
-      " passed."
-  )
+  message = f"The following metric values are all finite: {metric_columns}."
+  failed = False
+  return failed, message
 
 
-def _validate_all_metrics_are_positive(
-    data: pd.DataFrame, metric_columns: Collection[str], required: bool
-) -> None:
-  """Validates that all the metrics are positive."""
+@ValidationChecks.add_check("all_metrics_are_non_negative")
+def _validate_all_metrics_are_non_negative(
+    data: pd.DataFrame,
+    metric_columns: Collection[str],
+) -> tuple[bool, str]:
+  """Validates that all the metrics are not negative."""
   for metric_column in metric_columns:
     invalid_metric_count = (data[metric_column] < 0).sum()
 
     if invalid_metric_count:
-      if required:
-        raise ValueError(
-            f"There are {invalid_metric_count} negative values in"
-            f" {metric_column}. "
-        )
-      else:
-        print(
-            f"WARNING: There are {invalid_metric_count} negative values in"
-            f" {metric_column}. This will make it difficult to interpret "
-            "relative lift estimates."
-        )
+      message = (
+          f"There are {invalid_metric_count} negative values in"
+          f" {metric_column}. This will make relative effect measurements "
+          "difficult to interpret."
+      )
+      failed = True
+      return failed, message
 
-  if required:
-    print(
-        "The following metric values are all positive:"
-        f" {metric_columns}, check passed."
-    )
+  message = (
+      f"The following metric values are all non-negative: {metric_columns}."
+  )
+  failed = False
+  return failed, message
 
 
+@ValidationChecks.add_check("number_of_items_matches_design")
 def _validate_number_of_items_matches_design(
     experiment_data: pd.DataFrame,
     design: experiment_design.ExperimentDesign,
     item_id_column: str,
-) -> None:
+) -> tuple[bool, str]:
   """Validates the number of items matches n_items_after_pre_trim in design."""
   n_items = experiment_data[item_id_column].nunique()
   if n_items != design.n_items_after_pre_trim:
-    raise ValueError(
+    message = (
         f"The experiment data has {n_items} unique item_ids, but"
         f" {design.n_items_after_pre_trim = }."
     )
+    failed = True
+    return failed, message
 
-  print("Number of items matches design, check passed.")
+  message = "Number of items matches design, check passed."
+  failed = False
+  return failed, message
 
 
-def _validate_experiment_dates_match(
+@ValidationChecks.add_check("experiment_dates_match_design")
+def _validate_experiment_dates_match_design(
     experiment_data: pd.DataFrame,
     design: experiment_design.ExperimentDesign,
     date_column: str,
     experiment_start_date: str,
     experiment_has_concluded: bool,
-) -> None:
+) -> tuple[bool, str]:
   """Validates that the experiment dates match.
 
   This checks that the data contains the earliest and latest dates required,
@@ -867,50 +939,62 @@ def _validate_experiment_dates_match(
   actual_max_date = experiment_data[date_column].max()
 
   if actual_min_date > expected_min_date:
-    raise ValueError(
+    message = (
         "Experiment data does not go back far enough. Design expects"
         f" {design.pretest_weeks} weeks of pretest data, and experiment starts"
         f" on {experiment_start_date}, so the first date must be"
         f" {expected_min_date} or earlier, but the earliest date is"
         f" {actual_min_date}"
     )
+    failed = True
+    return failed, message
 
   if experiment_has_concluded:
     if actual_max_date < expected_max_date:
-      raise ValueError(
+      message = (
           "The experiment has concluded but you are missing data from the end"
           f" of the experiment. Design expects {design.runtime_weeks} weeks of"
           f" runtime data, and experiment starts on {experiment_start_date}, so"
           f" the final week must be {expected_max_date} or later, but latest"
           f" date is {actual_max_date}."
       )
+      failed = True
+      return failed, message
 
-  print("Date range matches design, check passed.")
+  message = "Date range matches design, check passed."
+  failed = False
+  return failed, message
 
 
+@ValidationChecks.add_check("treatment_assignment_is_unique")
 def _validate_treatment_assignment_is_unique_for_each_item_id(
     experiment_data: pd.DataFrame,
     item_id_column: str,
     treatment_assignment_column: str,
-) -> None:
+) -> tuple[bool, str]:
   n_assignments = experiment_data.groupby(item_id_column)[
       treatment_assignment_column
   ].nunique()
   if np.any(n_assignments != 1):
-    raise ValueError(
+    message = (
         "Some items have non-unique treatment assignments:"
         f" {n_assignments[n_assignments != 1]}"
     )
+    failed = True
+    return failed, message
 
-  print("Treatment assignment is unique for each item, check passed.")
+  message = "Treatment assignment is unique for each item."
+  failed = False
+  return failed, message
 
 
+@ValidationChecks.add_check("coinflip_salt_validation")
 def _validate_coinflip_matches_assignments(
     experiment_data: pd.DataFrame,
     design: experiment_design.ExperimentDesign,
     treatment_assignment_column: str,
     item_id_column: str,
-) -> None:
+) -> tuple[bool, str]:
   actual_assignments = experiment_data[treatment_assignment_column].values
   coinflip = experiment_design.Coinflip(salt=design.coinflip_salt)
   expected_assignments = experiment_data[item_id_column].apply(coinflip).values
@@ -918,22 +1002,27 @@ def _validate_coinflip_matches_assignments(
   if not np.array_equal(actual_assignments, expected_assignments):
     fraction_wrong = np.mean(actual_assignments != expected_assignments)
     number_wrong = np.sum(actual_assignments != expected_assignments)
-    raise ValueError(
+    message = (
         f"{number_wrong} ({fraction_wrong:.2%}) of the treatment assigments in"
         " the data do not match what was expected from the coinflip salt in"
         " the design. This could mean you have loaded the wrong design or"
         " treatment assignment files."
     )
+    failed = True
+    return failed, message
 
-  print("Coinflip salt from design matches assignments, check passed.")
+  failed = False
+  message = "Coinflip salt from design matches assignments."
+  return failed, message
 
 
+@ValidationChecks.add_check("no_sample_ratio_mismatch")
 def validate_no_sample_ratio_mismatch(
     experiment_data: pd.DataFrame,
     item_id_column: str,
     treatment_assignment_column: str,
     p_value_threshold: float = 0.001,
-) -> None:
+) -> tuple[bool, str]:
   """Validates there is no sample ratio mismatch in the treatment assignment.
 
   Sample ratio mismatch (SRM) occures when the number of samples in control and
@@ -948,24 +1037,48 @@ def validate_no_sample_ratio_mismatch(
     item_id_column: The column containing the item id.
     treatment_assignment_column: The column containing the treatment assignment,
       0 for control and 1 for treatment.
-     p_value_threshold: The threshold to compare the p-value against. Defaults
-       to 0.001.
+    p_value_threshold: The threshold to compare the p-value against. Defaults to
+      0.001.
 
-  Raises:
-    If the p-value for the null hypothesis that the probability of being
-    assigned to control is 50% is smaller than the p-value threshold.
+  Returns:
+    A tuple, where the first element is true if the validation failed and false
+    otherwise, and the second is a message to be printed for the user.
   """
   counts = experiment_data.groupby(treatment_assignment_column)[
       item_id_column
   ].nunique()
   srm_result = stats.binomtest(
-      counts[1], n=counts[1] + counts[0], p=0.5, alternative="two-sided"
+      counts.get(1, 0),
+      n=counts.get(1, 0) + counts.get(0, 0),
+      p=0.5,
+      alternative="two-sided",
   )
 
   if srm_result.pvalue < p_value_threshold:
-    raise ValueError(f"Sample ratio mismatch detected! {srm_result}")
+    message = f"Sample ratio mismatch detected! {srm_result}"
+    failed = True
+    return failed, message
 
-  print("No Sample Ratio Mismatch, check passed.")
+  message = "No Sample Ratio Mismatch."
+  failed = False
+  return failed, message
+
+
+@ValidationChecks.add_check("primary_metric_in_metrics")
+def _validate_primary_metric_in_metrics(
+    metric_columns: list[str],
+    primary_metric: str,
+) -> tuple[bool, str]:
+  if primary_metric not in metric_columns:
+    message = (
+        f"The primary metric {primary_metric} must be one of the"
+        f" metric_columns: {metric_columns}."
+    )
+    failed = True
+    return failed, message
+
+  failed = False
+  return failed, ""
 
 
 def validate_historical_data(
@@ -974,7 +1087,7 @@ def validate_historical_data(
     date_column: str,
     week_id_column: str,
     primary_metric_column: str,
-    require_positive_primary_metric: bool = True,
+    skip_validation_checks: list[str] | None = None,
 ) -> None:
   """Runs all the required validation for the historical data.
 
@@ -989,9 +1102,6 @@ def validate_historical_data(
     they are numeric and not infinite.
   - The week_id must be integers and consecutive.
 
-  If require_positive_primary_metric is true, it also validates that the primary
-  metric is always positive or 0.
-
   Args:
     historical_data: The historical data to be validated.
     item_id_column: The column in the data contining the item identifier.
@@ -999,32 +1109,44 @@ def validate_historical_data(
       have a datetime type.
     week_id_column: The column containing an integer identifier for the dates.
     primary_metric_column: The column containing the primary metric.
-    require_positive_primary_metric: Require that the primary metric is always
-      positive or 0. If set to False, it will check but not raise an exception
-      if there are negative metrics. Defaults to True.
+    skip_validation_checks: The list of validation checks to be skipped.
+      Defaults to None which doesn't skip any checks.
 
   Raises:
     ValueError: If any of the validations fail.
   """
+  list(map(ValidationChecks.assert_check_exists, skip_validation_checks or []))
 
-  _validate_no_null_values(historical_data)
-  _validate_every_value_exists_exactly_once_for_every_group(
+  _validate_no_null_values(
       historical_data,
-      group_column=date_column,
-      value_column=item_id_column,
+      skip_validation_checks=skip_validation_checks,
+  )
+  _validate_every_item_exists_exactly_once_for_every_date(
+      historical_data,
+      date_column=date_column,
+      item_id_column=item_id_column,
+      skip_validation_checks=skip_validation_checks,
   )
   _validate_dates_are_either_daily_or_weekly(
       historical_data,
       date_column=date_column,
+      skip_validation_checks=skip_validation_checks,
   )
-  _validate_week_ids_are_consecutive_integers(historical_data, week_id_column)
+  _validate_week_ids_are_consecutive_integers(
+      historical_data,
+      week_id_column=week_id_column,
+      date_column=date_column,
+      skip_validation_checks=skip_validation_checks,
+  )
   _validate_all_metrics_are_finite(
-      historical_data, metric_columns=[primary_metric_column]
-  )
-  _validate_all_metrics_are_positive(
       historical_data,
       metric_columns=[primary_metric_column],
-      required=require_positive_primary_metric,
+      skip_validation_checks=skip_validation_checks,
+  )
+  _validate_all_metrics_are_non_negative(
+      historical_data,
+      metric_columns=[primary_metric_column],
+      skip_validation_checks=skip_validation_checks,
   )
 
 
@@ -1040,7 +1162,7 @@ def validate_experiment_data(
     experiment_start_date: str,
     experiment_has_concluded: bool = True,
     can_be_negative_metric_columns: Collection[str] | None = None,
-    skip_validation_checks: list[ValidationChecks | str] | None = None,
+    skip_validation_checks: list[str] | None = None,
 ) -> None:
   """Runs all the required validation for the experiment data.
 
@@ -1052,7 +1174,7 @@ def validate_experiment_data(
   - The dates are either daily or weekly.
   - All metrics are finite. This is stricter than non-null as it ensures
     they are numeric and not infinite.
-  - The week_id must be integers and consecutive.
+  - The date_id must be integers and consecutive.
   - The metrics are not negative, unless they are in
     can_be_negative_metric_columns.
   - The number of items in the data matches the expected number in the design.
@@ -1070,7 +1192,7 @@ def validate_experiment_data(
     item_id_column: The column in the data contining the item identifier.
     date_column: The column in the data containing the date. This column must
       have a datetime type.
-    week_id_column: The column containing an integer identifier for the dates.
+    week_id_column: The column containing an integer identifier for the weeks.
     treatment_assignment_column: The column containing the treatment assignment,
       0 if the item is in the control group and 1 if it is in the treatment
       group.
@@ -1081,101 +1203,104 @@ def validate_experiment_data(
     experiment_has_concluded: Has the experiment finished (reached it's planned
       runtime)? Defaults to True.
     can_be_negative_metric_columns: The list of metric columns that are allowed
-      to be negative. Defaults to None, meaning all metrics must be positive.
-    skip_validation_checks: The list of validation checks to be skipped. Defaults
-      to None which doesn't skip any steps.
+      to be negative. Defaults to None, meaning all metrics must be non
+      negative.
+    skip_validation_checks: The list of validation checks to be skipped.
+      Defaults to None which doesn't skip any checks.
 
   Raises:
     ValueError: If any of the validations fail.
   """
-  skip_validation_checks = list(
-      map(ValidationChecks, skip_validation_checks or [])
+  list(map(ValidationChecks.assert_check_exists, skip_validation_checks or []))
+
+  _validate_primary_metric_in_metrics(
+      metric_columns=metric_columns,
+      primary_metric=design.primary_metric,
+      skip_validation_checks=skip_validation_checks,
   )
 
-  if design.primary_metric not in metric_columns:
-    raise ValueError(
-        f"The primary metric {design.primary_metric} must be one of the"
-        " metric_columns."
-    )
+  _validate_no_null_values(
+      experiment_data,
+      skip_validation_checks=skip_validation_checks,
+  )
 
-  if ValidationChecks.NO_NULLS not in skip_validation_checks:
-    _validate_no_null_values(experiment_data)
+  _validate_every_item_exists_exactly_once_for_every_date(
+      experiment_data,
+      date_column=date_column,
+      item_id_column=item_id_column,
+      skip_validation_checks=skip_validation_checks,
+  )
 
-  if ValidationChecks.NO_DUPLICATE_ITEMS_PER_DATE not in skip_validation_checks:
-    _validate_every_value_exists_exactly_once_for_every_group(
+  _validate_dates_are_either_daily_or_weekly(
+      experiment_data,
+      date_column=date_column,
+      skip_validation_checks=skip_validation_checks,
+  )
+
+  _validate_week_ids_are_consecutive_integers(
+      experiment_data,
+      week_id_column=week_id_column,
+      date_column=date_column,
+      skip_validation_checks=skip_validation_checks,
+  )
+
+  _validate_all_metrics_are_finite(
+      experiment_data,
+      metric_columns=metric_columns,
+      skip_validation_checks=skip_validation_checks,
+  )
+
+  can_be_negative_metric_columns = can_be_negative_metric_columns or []
+  require_non_negative_metric_columns = [
+      metric_column
+      for metric_column in metric_columns
+      if metric_column not in can_be_negative_metric_columns
+  ]
+
+  if require_non_negative_metric_columns:
+    _validate_all_metrics_are_non_negative(
         experiment_data,
-        group_column=date_column,
-        value_column=item_id_column,
+        metric_columns=require_non_negative_metric_columns,
+        skip_validation_checks=skip_validation_checks,
     )
 
-  if ValidationChecks.WEEKLY_OR_DAILY_DATES not in skip_validation_checks:
-    _validate_dates_are_either_daily_or_weekly(
-        experiment_data,
-        date_column=date_column,
-    )
+  _validate_number_of_items_matches_design(
+      experiment_data,
+      design,
+      item_id_column,
+      skip_validation_checks=skip_validation_checks,
+  )
 
-  if ValidationChecks.CONSECUTIVE_WEEK_IDS not in skip_validation_checks:
-    _validate_week_ids_are_consecutive_integers(experiment_data, week_id_column)
+  _validate_experiment_dates_match_design(
+      experiment_data,
+      design=design,
+      date_column=date_column,
+      experiment_start_date=experiment_start_date,
+      experiment_has_concluded=experiment_has_concluded,
+      skip_validation_checks=skip_validation_checks,
+  )
 
-  if ValidationChecks.FINITE_METRICS not in skip_validation_checks:
-    _validate_all_metrics_are_finite(
-        experiment_data, metric_columns=metric_columns
-    )
+  _validate_treatment_assignment_is_unique_for_each_item_id(
+      experiment_data,
+      item_id_column,
+      treatment_assignment_column,
+      skip_validation_checks=skip_validation_checks,
+  )
 
-  if ValidationChecks.POSITIVE_METRICS not in skip_validation_checks:
-    can_be_negative_metric_columns = can_be_negative_metric_columns or []
-    require_non_negative_metric_columns = [
-        metric_column
-        for metric_column in metric_columns
-        if metric_column not in can_be_negative_metric_columns
-    ]
-    if require_non_negative_metric_columns:
-      _validate_all_metrics_are_positive(
-          experiment_data,
-          metric_columns=require_non_negative_metric_columns,
-          required=True,
-      )
-    if can_be_negative_metric_columns:
-      _validate_all_metrics_are_positive(
-          experiment_data,
-          metric_columns=can_be_negative_metric_columns,
-          required=False,
-      )
+  _validate_coinflip_matches_assignments(
+      experiment_data,
+      design=design,
+      treatment_assignment_column=treatment_assignment_column,
+      item_id_column=item_id_column,
+      skip_validation_checks=skip_validation_checks,
+  )
 
-  if ValidationChecks.NUMBER_OF_ITEMS_MATCH_DESIGN not in skip_validation_checks:
-    _validate_number_of_items_matches_design(
-        experiment_data, design, item_id_column
-    )
-
-  if (
-      ValidationChecks.EXPERIMENT_DATES_MATCH_DESIGN
-      not in skip_validation_checks
-  ):
-    _validate_experiment_dates_match(
-        experiment_data,
-        design=design,
-        date_column=date_column,
-        experiment_start_date=experiment_start_date,
-        experiment_has_concluded=experiment_has_concluded,
-    )
-
-  if (
-      ValidationChecks.TREATMENT_ASSIGNMENT_IS_UNIQUE
-      not in skip_validation_checks
-  ):
-    _validate_treatment_assignment_is_unique_for_each_item_id(
-        experiment_data, item_id_column, treatment_assignment_column
-    )
-
-  if ValidationChecks.COINFLIP_SALT_VALIDATION not in skip_validation_checks:
-    _validate_coinflip_matches_assignments(
-        experiment_data, design, treatment_assignment_column, item_id_column
-    )
-
-  if ValidationChecks.NO_SAMPLE_RATIO_MISMATCH not in skip_validation_checks:
-    validate_no_sample_ratio_mismatch(
-        experiment_data, item_id_column, treatment_assignment_column
-    )
+  validate_no_sample_ratio_mismatch(
+      experiment_data,
+      item_id_column,
+      treatment_assignment_column,
+      skip_validation_checks=skip_validation_checks,
+  )
 
 
 def add_at_least_one_metrics(
@@ -1217,7 +1342,7 @@ def prepare_and_validate_historical_data(
     primary_metric_column: str,
     rng: np.random.RandomState,
     item_sample_fraction: float = 1.0,
-    require_positive_primary_metric: bool = True,
+    skip_validation_checks: list[str] | None = None,
 ) -> pd.DataFrame:
   """Prepares and validates the historical data for the experiment design.
 
@@ -1242,8 +1367,8 @@ def prepare_and_validate_historical_data(
     rng: The random number generator used if downsampling is applied.
     item_sample_fraction: The faction of items to sample if doing downsampling.
       If set to 1, no downsampling is done. Defaults to 1.
-    require_positive_primary_metric: Whether the primary metric should always be
-      positive or not. Defaults to true.
+    skip_validation_checks: The list of validation checks to be skipped.
+      Defaults to None which doesn't skip any checks.
 
   Returns:
     The processed data.
@@ -1307,7 +1432,7 @@ def prepare_and_validate_historical_data(
       date_column="week_start",
       week_id_column="week_id",
       primary_metric_column=primary_metric,
-      require_positive_primary_metric=require_positive_primary_metric,
+      skip_validation_checks=skip_validation_checks,
   )
 
   return clean_data
@@ -1331,7 +1456,7 @@ def prepare_and_validate_experiment_data(
     can_be_negative_metric_columns: list[str] | None = None,
     at_least_one_metrics: dict[str, str] | None = None,
     experiment_has_concluded: bool = True,
-    skip_validation_checks: list[ValidationChecks | str] | None = None,
+    skip_validation_checks: list[str] | None = None,
 ) -> pd.DataFrame:
   """Prepares and validates the experiment data for the experiment analysis.
 
@@ -1375,8 +1500,8 @@ def prepare_and_validate_experiment_data(
       "at_least_one_click"}. If not adding any at least one metrics, set to
       None. Defaults to None.
     experiment_has_concluded: Has the experiment finished? Defaults to True.
-    skip_validation_checks: The list of validation checks to be skipped. Defaults
-      to None which doesn't skip any steps.
+    skip_validation_checks: The list of validation checks to be skipped.
+      Defaults to None which doesn't skip any checks.
 
   Returns:
     The processed data.

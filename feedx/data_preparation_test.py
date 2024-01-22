@@ -394,7 +394,32 @@ class ValidateHistoricalDataTests(parameterized.TestCase):
         primary_metric_column="clicks",
     )
 
-  def test_historical_data_must_have_unique_item_id_and_dates(self):
+  def test_validate_historical_data_raises_exception_for_unknown_skip_validation_check(
+      self,
+  ):
+    historical_data = pd.DataFrame({
+        "date": pd.to_datetime(
+            ["2023-10-01", "2023-10-01", "2023-10-08", "2023-10-08"]
+        ),
+        "week_id": [1, 1, 2, 2],
+        "item_id": ["1", "2", "1", "2"],
+        "clicks": [1, 2, 3, 4],
+    })
+
+    with self.assertRaises(ValueError):
+      data_preparation.validate_historical_data(
+          historical_data,
+          item_id_column="item_id",
+          date_column="date",
+          week_id_column="week_id",
+          primary_metric_column="clicks",
+          skip_validation_checks=["unknown_check"],
+      )
+
+  @parameterized.parameters(True, False)
+  def test_historical_data_must_have_unique_item_id_and_dates(
+      self, raise_on_failure
+  ):
     bad_historical_data = pd.DataFrame({
         "date": pd.to_datetime([
             "2023-10-01",
@@ -408,16 +433,36 @@ class ValidateHistoricalDataTests(parameterized.TestCase):
         "clicks": [1, 2, 3, 4, 5],
     })
 
-    with self.assertRaises(ValueError):
-      data_preparation.validate_historical_data(
-          bad_historical_data,
-          item_id_column="item_id",
-          date_column="date",
-          week_id_column="week_id",
-          primary_metric_column="clicks",
+    if raise_on_failure:
+      with self.assertRaises(ValueError):
+        data_preparation.validate_historical_data(
+            bad_historical_data,
+            item_id_column="item_id",
+            date_column="date",
+            week_id_column="week_id",
+            primary_metric_column="clicks",
+        )
+    else:
+      with mock.patch("builtins.print") as mock_print:
+        data_preparation.validate_historical_data(
+            bad_historical_data,
+            item_id_column="item_id",
+            date_column="date",
+            week_id_column="week_id",
+            primary_metric_column="clicks",
+            skip_validation_checks=["no_duplicate_items_per_date"],
+        )
+      all_prints = " ".join([call[0][0] for call in mock_print.call_args_list])
+      self.assertIn(
+          "WARNING: Validation check 'no_duplicate_items_per_date' failed, but"
+          " was skipped.",
+          all_prints,
       )
 
-  def test_historical_data_must_have_every_item_and_date_combination(self):
+  @parameterized.parameters(True, False)
+  def test_historical_data_must_have_every_item_and_date_combination(
+      self, raise_on_failure
+  ):
     bad_historical_data = pd.DataFrame({
         "date": pd.to_datetime(["2023-10-01", "2023-10-01", "2023-10-02"]),
         "week_id": [1, 1, 2],
@@ -425,16 +470,35 @@ class ValidateHistoricalDataTests(parameterized.TestCase):
         "clicks": [1, 2, 3],
     })
 
-    with self.assertRaises(ValueError):
-      data_preparation.validate_historical_data(
-          bad_historical_data,
-          item_id_column="item_id",
-          date_column="date",
-          week_id_column="week_id",
-          primary_metric_column="clicks",
+    if raise_on_failure:
+      with self.assertRaises(ValueError):
+        data_preparation.validate_historical_data(
+            bad_historical_data,
+            item_id_column="item_id",
+            date_column="date",
+            week_id_column="week_id",
+            primary_metric_column="clicks",
+        )
+    else:
+      with mock.patch("builtins.print") as mock_print:
+        data_preparation.validate_historical_data(
+            bad_historical_data,
+            item_id_column="item_id",
+            date_column="date",
+            week_id_column="week_id",
+            primary_metric_column="clicks",
+            skip_validation_checks=["no_duplicate_items_per_date"],
+        )
+
+      all_prints = " ".join([call[0][0] for call in mock_print.call_args_list])
+      self.assertIn(
+          "WARNING: Validation check 'no_duplicate_items_per_date' failed, but"
+          " was skipped.",
+          all_prints,
       )
 
-  def test_historical_data_must_have_no_nulls(self):
+  @parameterized.parameters(True, False)
+  def test_historical_data_must_have_no_nulls(self, raise_on_failure):
     bad_historical_data = pd.DataFrame({
         "date": pd.to_datetime(
             ["2023-10-01", "2023-10-01", "2023-10-02", "2023-10-02"]
@@ -444,16 +508,44 @@ class ValidateHistoricalDataTests(parameterized.TestCase):
         "clicks": [1, 2, 3, None],
     })
 
-    with self.assertRaises(ValueError):
-      data_preparation.validate_historical_data(
-          bad_historical_data,
-          item_id_column="item_id",
-          date_column="date",
-          week_id_column="week_id",
-          primary_metric_column="clicks",
+    if raise_on_failure:
+      with self.assertRaises(ValueError):
+        data_preparation.validate_historical_data(
+            bad_historical_data,
+            item_id_column="item_id",
+            date_column="date",
+            week_id_column="week_id",
+            primary_metric_column="clicks",
+            skip_validation_checks=[
+                "all_metrics_are_finite",
+                "all_metrics_are_non_negative",
+            ],
+        )
+    else:
+      with mock.patch("builtins.print") as mock_print:
+        data_preparation.validate_historical_data(
+            bad_historical_data,
+            item_id_column="item_id",
+            date_column="date",
+            week_id_column="week_id",
+            primary_metric_column="clicks",
+            skip_validation_checks=[
+                "no_nulls",
+                "all_metrics_are_finite",
+                "all_metrics_are_non_negative",
+            ],
+        )
+
+      all_prints = " ".join([call[0][0] for call in mock_print.call_args_list])
+      self.assertIn(
+          "WARNING: Validation check 'no_nulls' failed, but was skipped.",
+          all_prints,
       )
 
-  def test_historical_data_must_be_either_daily_or_weekly_spaced(self):
+  @parameterized.parameters(True, False)
+  def test_historical_data_must_be_either_daily_or_weekly_spaced(
+      self, raise_on_failure
+  ):
     bad_historical_data = pd.DataFrame({
         "date": pd.to_datetime(
             ["2023-10-01", "2023-10-01", "2023-10-03", "2023-10-03"]
@@ -463,35 +555,75 @@ class ValidateHistoricalDataTests(parameterized.TestCase):
         "clicks": [1, 2, 3, 4],
     })
 
-    with self.assertRaises(ValueError):
-      data_preparation.validate_historical_data(
-          bad_historical_data,
-          item_id_column="item_id",
-          date_column="date",
-          week_id_column="week_id",
-          primary_metric_column="clicks",
+    if raise_on_failure:
+      with self.assertRaises(ValueError):
+        data_preparation.validate_historical_data(
+            bad_historical_data,
+            item_id_column="item_id",
+            date_column="date",
+            week_id_column="week_id",
+            primary_metric_column="clicks",
+        )
+    else:
+      with mock.patch("builtins.print") as mock_print:
+        data_preparation.validate_historical_data(
+            bad_historical_data,
+            item_id_column="item_id",
+            date_column="date",
+            week_id_column="week_id",
+            primary_metric_column="clicks",
+            skip_validation_checks=["dates_are_daily_or_weekly"],
+        )
+      all_prints = " ".join([call[0][0] for call in mock_print.call_args_list])
+      self.assertIn(
+          "WARNING: Validation check 'dates_are_daily_or_weekly' failed, but"
+          " was skipped.",
+          all_prints,
       )
 
-  def test_historical_data_week_id_must_be_aligned_with_date(self):
+  @parameterized.parameters(True, False)
+  def test_historical_data_week_id_must_be_aligned_with_date(
+      self, raise_on_failure
+  ):
     bad_historical_data = pd.DataFrame({
         "date": pd.to_datetime(
-            ["2023-10-01", "2023-10-01", "2023-10-03", "2023-10-03"]
+            ["2023-10-01", "2023-10-01", "2023-10-02", "2023-10-02"]
         ),
         "week_id": [2, 2, 1, 1],
         "item_id": ["1", "2", "1", "2"],
         "clicks": [1, 2, 3, 4],
     })
 
-    with self.assertRaises(ValueError):
-      data_preparation.validate_historical_data(
-          bad_historical_data,
-          item_id_column="item_id",
-          date_column="date",
-          week_id_column="week_id",
-          primary_metric_column="clicks",
+    if raise_on_failure:
+      with self.assertRaises(ValueError):
+        data_preparation.validate_historical_data(
+            bad_historical_data,
+            item_id_column="item_id",
+            date_column="date",
+            week_id_column="week_id",
+            primary_metric_column="clicks",
+        )
+    else:
+      with mock.patch("builtins.print") as mock_print:
+        data_preparation.validate_historical_data(
+            bad_historical_data,
+            item_id_column="item_id",
+            date_column="date",
+            week_id_column="week_id",
+            primary_metric_column="clicks",
+            skip_validation_checks=["week_ids_are_consecutive_integers"],
+        )
+      all_prints = " ".join([call[0][0] for call in mock_print.call_args_list])
+      self.assertIn(
+          "WARNING: Validation check 'week_ids_are_consecutive_integers'"
+          " failed, but was skipped.",
+          all_prints,
       )
 
-  def test_historical_data_primary_metric_must_be_finite(self):
+  @parameterized.parameters(True, False)
+  def test_historical_data_primary_metric_must_be_finite(
+      self, raise_on_failure
+  ):
     bad_historical_data = pd.DataFrame({
         "date": pd.to_datetime(
             ["2023-10-01", "2023-10-01", "2023-10-02", "2023-10-02"]
@@ -501,16 +633,36 @@ class ValidateHistoricalDataTests(parameterized.TestCase):
         "clicks": [1, 2, 3, np.inf],
     })
 
-    with self.assertRaises(ValueError):
-      data_preparation.validate_historical_data(
-          bad_historical_data,
-          item_id_column="item_id",
-          date_column="date",
-          week_id_column="week_id",
-          primary_metric_column="clicks",
+    if raise_on_failure:
+      with self.assertRaises(ValueError):
+        data_preparation.validate_historical_data(
+            bad_historical_data,
+            item_id_column="item_id",
+            date_column="date",
+            week_id_column="week_id",
+            primary_metric_column="clicks",
+        )
+    else:
+      with mock.patch("builtins.print") as mock_print:
+        data_preparation.validate_historical_data(
+            bad_historical_data,
+            item_id_column="item_id",
+            date_column="date",
+            week_id_column="week_id",
+            primary_metric_column="clicks",
+            skip_validation_checks=["all_metrics_are_finite"],
+        )
+      all_prints = " ".join([call[0][0] for call in mock_print.call_args_list])
+      self.assertIn(
+          "WARNING: Validation check 'all_metrics_are_finite' failed, but was"
+          " skipped.",
+          all_prints,
       )
 
-  def test_historical_data_metrics_must_be_non_negative_by_default(self):
+  @parameterized.parameters(True, False)
+  def test_historical_data_metrics_must_be_non_negative_by_default(
+      self, raise_on_failure
+  ):
     bad_historical_data = pd.DataFrame({
         "date": pd.to_datetime(
             ["2023-10-01", "2023-10-01", "2023-10-02", "2023-10-02"]
@@ -520,55 +672,67 @@ class ValidateHistoricalDataTests(parameterized.TestCase):
         "clicks": [1, 2, 3, -1],
     })
 
-    with self.assertRaises(ValueError):
-      data_preparation.validate_historical_data(
-          bad_historical_data,
-          item_id_column="item_id",
-          date_column="date",
-          week_id_column="week_id",
-          primary_metric_column="clicks",
+    if raise_on_failure:
+      with self.assertRaises(ValueError):
+        data_preparation.validate_historical_data(
+            bad_historical_data,
+            item_id_column="item_id",
+            date_column="date",
+            week_id_column="week_id",
+            primary_metric_column="clicks",
+        )
+    else:
+      with mock.patch("builtins.print") as mock_print:
+        data_preparation.validate_historical_data(
+            bad_historical_data,
+            item_id_column="item_id",
+            date_column="date",
+            week_id_column="week_id",
+            primary_metric_column="clicks",
+            skip_validation_checks=["all_metrics_are_non_negative"],
+        )
+      all_prints = " ".join([call[0][0] for call in mock_print.call_args_list])
+      self.assertIn(
+          "WARNING: Validation check 'all_metrics_are_non_negative'"
+          " failed, but was skipped.",
+          all_prints,
       )
 
-  def test_historical_data_metrics_may_be_non_negative_if_require_positive_primary_metric_is_false(
-      self,
-  ):
-    good_historical_data = pd.DataFrame({
-        "date": pd.to_datetime(
-            ["2023-10-01", "2023-10-01", "2023-10-02", "2023-10-02"]
-        ),
-        "week_id": [1, 1, 2, 2],
-        "item_id": ["1", "2", "1", "2"],
-        "clicks": [1, 2, 3, -1],
-    })
-
-    data_preparation.validate_historical_data(
-        good_historical_data,
-        item_id_column="item_id",
-        date_column="date",
-        week_id_column="week_id",
-        primary_metric_column="clicks",
-        require_positive_primary_metric=False,
-    )
-
-  def test_historical_data_week_id_must_be_consecutive(
-      self,
-  ):
+  @parameterized.parameters(True, False)
+  def test_historical_data_week_id_must_be_consecutive(self, raise_on_failure):
     good_historical_data = pd.DataFrame({
         "date": pd.to_datetime(
             ["2023-10-01", "2023-10-01", "2023-10-02", "2023-10-02"]
         ),
         "week_id": [1, 1, 3, 3],
         "item_id": ["1", "2", "1", "2"],
-        "clicks": [1, 2, 3, -1],
+        "clicks": [1, 2, 3, 1],
     })
-    with self.assertRaises(ValueError):
-      data_preparation.validate_historical_data(
-          good_historical_data,
-          item_id_column="item_id",
-          date_column="date",
-          week_id_column="week_id",
-          primary_metric_column="clicks",
-          require_positive_primary_metric=False,
+
+    if raise_on_failure:
+      with self.assertRaises(ValueError):
+        data_preparation.validate_historical_data(
+            good_historical_data,
+            item_id_column="item_id",
+            date_column="date",
+            week_id_column="week_id",
+            primary_metric_column="clicks",
+        )
+    else:
+      with mock.patch("builtins.print") as mock_print:
+        data_preparation.validate_historical_data(
+            good_historical_data,
+            item_id_column="item_id",
+            date_column="date",
+            week_id_column="week_id",
+            primary_metric_column="clicks",
+            skip_validation_checks=["week_ids_are_consecutive_integers"],
+        )
+      all_prints = " ".join([call[0][0] for call in mock_print.call_args_list])
+      self.assertIn(
+          "WARNING: Validation check 'week_ids_are_consecutive_integers'"
+          " failed, but was skipped.",
+          all_prints,
       )
 
   def test_historical_data_week_id_must_be_an_integer(
@@ -590,7 +754,7 @@ class ValidateHistoricalDataTests(parameterized.TestCase):
           date_column="date",
           week_id_column="week_id",
           primary_metric_column="clicks",
-          require_positive_primary_metric=False,
+          skip_validation_checks=["positive_metrics"],
       )
 
 
@@ -681,17 +845,18 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         treatment_assignment_column="treatment_assignment",
     )
 
+  @parameterized.parameters(True, False)
   @mock_experiment_design_validation
   def test_experiment_data_must_have_unique_item_id_and_dates(
-      self, mock_experiment_design
+      self, raise_on_failure, mock_experiment_design
   ):
     bad_experiment_data = pd.DataFrame({
         "date": pd.to_datetime([
             "2023-10-01",
             "2023-10-01",
-            "2023-10-02",
-            "2023-10-02",
-            "2023-10-02",
+            "2023-10-08",
+            "2023-10-08",
+            "2023-10-08",
         ]),
         "week_id": [1, 1, 2, 2, 2],
         "item_id": ["1", "2", "1", "2", "2"],
@@ -706,24 +871,45 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         **self.irrelevant_design_args
     )
 
-    with self.assertRaises(ValueError):
-      data_preparation.validate_experiment_data(
-          bad_experiment_data,
-          design=design,
-          item_id_column="item_id",
-          date_column="date",
-          week_id_column="week_id",
-          metric_columns=["clicks", "impressions"],
-          experiment_start_date="2023-10-01",
-          treatment_assignment_column="treatment_assignment",
+    if raise_on_failure:
+      with self.assertRaises(ValueError):
+        data_preparation.validate_experiment_data(
+            bad_experiment_data,
+            design=design,
+            item_id_column="item_id",
+            date_column="date",
+            week_id_column="week_id",
+            metric_columns=["clicks", "impressions"],
+            experiment_start_date="2023-10-01",
+            treatment_assignment_column="treatment_assignment",
+        )
+    else:
+      with mock.patch("builtins.print") as mock_print:
+        data_preparation.validate_experiment_data(
+            bad_experiment_data,
+            design=design,
+            item_id_column="item_id",
+            date_column="date",
+            week_id_column="week_id",
+            metric_columns=["clicks", "impressions"],
+            experiment_start_date="2023-10-01",
+            treatment_assignment_column="treatment_assignment",
+            skip_validation_checks=["no_duplicate_items_per_date"],
+        )
+      all_prints = " ".join([call[0][0] for call in mock_print.call_args_list])
+      self.assertIn(
+          "WARNING: Validation check 'no_duplicate_items_per_date'"
+          " failed, but was skipped.",
+          all_prints,
       )
 
+  @parameterized.parameters(True, False)
   @mock_experiment_design_validation
   def test_experiment_data_must_have_every_item_and_date_combination(
-      self, mock_experiment_design
+      self, raise_on_failure, mock_experiment_design
   ):
     bad_experiment_data = pd.DataFrame({
-        "date": pd.to_datetime(["2023-10-01", "2023-10-01", "2023-10-02"]),
+        "date": pd.to_datetime(["2023-10-01", "2023-10-01", "2023-10-08"]),
         "week_id": [1, 1, 2],
         "item_id": ["1", "2", "1"],
         "clicks": [1, 2, 3],
@@ -737,23 +923,46 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         **self.irrelevant_design_args
     )
 
-    with self.assertRaises(ValueError):
-      data_preparation.validate_experiment_data(
-          bad_experiment_data,
-          design=design,
-          item_id_column="item_id",
-          date_column="date",
-          week_id_column="week_id",
-          metric_columns=["clicks", "impressions"],
-          experiment_start_date="2023-10-01",
-          treatment_assignment_column="treatment_assignment",
+    if raise_on_failure:
+      with self.assertRaises(ValueError):
+        data_preparation.validate_experiment_data(
+            bad_experiment_data,
+            design=design,
+            item_id_column="item_id",
+            date_column="date",
+            week_id_column="week_id",
+            metric_columns=["clicks", "impressions"],
+            experiment_start_date="2023-10-01",
+            treatment_assignment_column="treatment_assignment",
+        )
+    else:
+      with mock.patch("builtins.print") as mock_print:
+        data_preparation.validate_experiment_data(
+            bad_experiment_data,
+            design=design,
+            item_id_column="item_id",
+            date_column="date",
+            week_id_column="week_id",
+            metric_columns=["clicks", "impressions"],
+            experiment_start_date="2023-10-01",
+            treatment_assignment_column="treatment_assignment",
+            skip_validation_checks=["no_duplicate_items_per_date"],
+        )
+      all_prints = " ".join([call[0][0] for call in mock_print.call_args_list])
+      self.assertIn(
+          "WARNING: Validation check 'no_duplicate_items_per_date'"
+          " failed, but was skipped.",
+          all_prints,
       )
 
+  @parameterized.parameters(True, False)
   @mock_experiment_design_validation
-  def test_experiment_data_must_have_no_nulls(self, mock_experiment_design):
+  def test_experiment_data_must_have_no_nulls(
+      self, raise_on_failure, mock_experiment_design
+  ):
     bad_experiment_data = pd.DataFrame({
         "date": pd.to_datetime(
-            ["2023-10-01", "2023-10-01", "2023-10-02", "2023-10-02"]
+            ["2023-10-01", "2023-10-01", "2023-10-08", "2023-10-08"]
         ),
         "week_id": [1, 1, 2, 2],
         "item_id": ["1", "2", "1", "2"],
@@ -768,21 +977,49 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         **self.irrelevant_design_args
     )
 
-    with self.assertRaises(ValueError):
-      data_preparation.validate_experiment_data(
-          bad_experiment_data,
-          design=design,
-          item_id_column="item_id",
-          date_column="date",
-          week_id_column="week_id",
-          metric_columns=["clicks", "impressions"],
-          experiment_start_date="2023-10-01",
-          treatment_assignment_column="treatment_assignment",
+    if raise_on_failure:
+      with self.assertRaises(ValueError):
+        data_preparation.validate_experiment_data(
+            bad_experiment_data,
+            design=design,
+            item_id_column="item_id",
+            date_column="date",
+            week_id_column="week_id",
+            metric_columns=["clicks", "impressions"],
+            experiment_start_date="2023-10-01",
+            treatment_assignment_column="treatment_assignment",
+            skip_validation_checks=[
+                "all_metrics_are_finite",
+                "all_metrics_are_non_negative",
+            ],
+        )
+    else:
+      with mock.patch("builtins.print") as mock_print:
+        data_preparation.validate_experiment_data(
+            bad_experiment_data,
+            design=design,
+            item_id_column="item_id",
+            date_column="date",
+            week_id_column="week_id",
+            metric_columns=["clicks", "impressions"],
+            experiment_start_date="2023-10-01",
+            treatment_assignment_column="treatment_assignment",
+            skip_validation_checks=[
+                "no_nulls",
+                "all_metrics_are_finite",
+                "all_metrics_are_non_negative",
+            ],
+        )
+      all_prints = " ".join([call[0][0] for call in mock_print.call_args_list])
+      self.assertIn(
+          "WARNING: Validation check 'no_nulls' failed, but was skipped.",
+          all_prints,
       )
 
+  @parameterized.parameters(True, False)
   @mock_experiment_design_validation
   def test_experiment_data_must_be_either_daily_or_weekly_spaced(
-      self, mock_experiment_design
+      self, raise_on_failure, mock_experiment_design
   ):
     bad_experiment_data = pd.DataFrame({
         "date": pd.to_datetime(
@@ -801,25 +1038,48 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         **self.irrelevant_design_args
     )
 
-    with self.assertRaises(ValueError):
-      data_preparation.validate_experiment_data(
-          bad_experiment_data,
-          design=design,
-          item_id_column="item_id",
-          date_column="date",
-          week_id_column="week_id",
-          metric_columns=["clicks", "impressions"],
-          experiment_start_date="2023-10-01",
-          treatment_assignment_column="treatment_assignment",
+    if raise_on_failure:
+      with self.assertRaises(ValueError):
+        data_preparation.validate_experiment_data(
+            bad_experiment_data,
+            design=design,
+            item_id_column="item_id",
+            date_column="date",
+            week_id_column="week_id",
+            metric_columns=["clicks", "impressions"],
+            experiment_start_date="2023-10-01",
+            treatment_assignment_column="treatment_assignment",
+            experiment_has_concluded=False,
+        )
+    else:
+      with mock.patch("builtins.print") as mock_print:
+        data_preparation.validate_experiment_data(
+            bad_experiment_data,
+            design=design,
+            item_id_column="item_id",
+            date_column="date",
+            week_id_column="week_id",
+            metric_columns=["clicks", "impressions"],
+            experiment_start_date="2023-10-01",
+            treatment_assignment_column="treatment_assignment",
+            skip_validation_checks=["dates_are_daily_or_weekly"],
+            experiment_has_concluded=False,
+        )
+      all_prints = " ".join([call[0][0] for call in mock_print.call_args_list])
+      self.assertIn(
+          "WARNING: Validation check 'dates_are_daily_or_weekly'"
+          " failed, but was skipped.",
+          all_prints,
       )
 
+  @parameterized.parameters(True, False)
   @mock_experiment_design_validation
   def test_experiment_data_week_id_must_be_aligned_with_date(
-      self, mock_experiment_design
+      self, raise_on_failure, mock_experiment_design
   ):
     bad_experiment_data = pd.DataFrame({
         "date": pd.to_datetime(
-            ["2023-10-01", "2023-10-01", "2023-10-03", "2023-10-03"]
+            ["2023-10-01", "2023-10-01", "2023-10-08", "2023-10-08"]
         ),
         "week_id": [2, 2, 1, 1],
         "item_id": ["1", "2", "1", "2"],
@@ -834,25 +1094,46 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         **self.irrelevant_design_args
     )
 
-    with self.assertRaises(ValueError):
-      data_preparation.validate_experiment_data(
-          bad_experiment_data,
-          design=design,
-          item_id_column="item_id",
-          date_column="date",
-          week_id_column="week_id",
-          metric_columns=["clicks", "impressions"],
-          experiment_start_date="2023-10-01",
-          treatment_assignment_column="treatment_assignment",
+    if raise_on_failure:
+      with self.assertRaises(ValueError):
+        data_preparation.validate_experiment_data(
+            bad_experiment_data,
+            design=design,
+            item_id_column="item_id",
+            date_column="date",
+            week_id_column="week_id",
+            metric_columns=["clicks", "impressions"],
+            experiment_start_date="2023-10-01",
+            treatment_assignment_column="treatment_assignment",
+        )
+    else:
+      with mock.patch("builtins.print") as mock_print:
+        data_preparation.validate_experiment_data(
+            bad_experiment_data,
+            design=design,
+            item_id_column="item_id",
+            date_column="date",
+            week_id_column="week_id",
+            metric_columns=["clicks", "impressions"],
+            experiment_start_date="2023-10-01",
+            treatment_assignment_column="treatment_assignment",
+            skip_validation_checks=["week_ids_are_consecutive_integers"],
+        )
+      all_prints = " ".join([call[0][0] for call in mock_print.call_args_list])
+      self.assertIn(
+          "WARNING: Validation check 'week_ids_are_consecutive_integers'"
+          " failed, but was skipped.",
+          all_prints,
       )
 
+  @parameterized.parameters(True, False)
   @mock_experiment_design_validation
-  def test_experiment_data_primary_metric_must_be_finite(
-      self, mock_experiment_design
+  def test_experiment_data_metrics_must_be_finite(
+      self, raise_on_failure, mock_experiment_design
   ):
     bad_experiment_data = pd.DataFrame({
         "date": pd.to_datetime(
-            ["2023-10-01", "2023-10-01", "2023-10-02", "2023-10-02"]
+            ["2023-10-01", "2023-10-01", "2023-10-08", "2023-10-08"]
         ),
         "week_id": [1, 1, 2, 2],
         "item_id": ["1", "2", "1", "2"],
@@ -867,25 +1148,46 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         **self.irrelevant_design_args
     )
 
-    with self.assertRaises(ValueError):
-      data_preparation.validate_experiment_data(
-          bad_experiment_data,
-          design=design,
-          item_id_column="item_id",
-          date_column="date",
-          week_id_column="week_id",
-          metric_columns=["clicks", "impressions"],
-          experiment_start_date="2023-10-01",
-          treatment_assignment_column="treatment_assignment",
+    if raise_on_failure:
+      with self.assertRaises(ValueError):
+        data_preparation.validate_experiment_data(
+            bad_experiment_data,
+            design=design,
+            item_id_column="item_id",
+            date_column="date",
+            week_id_column="week_id",
+            metric_columns=["clicks", "impressions"],
+            experiment_start_date="2023-10-01",
+            treatment_assignment_column="treatment_assignment",
+        )
+    else:
+      with mock.patch("builtins.print") as mock_print:
+        data_preparation.validate_experiment_data(
+            bad_experiment_data,
+            design=design,
+            item_id_column="item_id",
+            date_column="date",
+            week_id_column="week_id",
+            metric_columns=["clicks", "impressions"],
+            experiment_start_date="2023-10-01",
+            treatment_assignment_column="treatment_assignment",
+            skip_validation_checks=["all_metrics_are_finite"],
+        )
+      all_prints = " ".join([call[0][0] for call in mock_print.call_args_list])
+      self.assertIn(
+          "WARNING: Validation check 'all_metrics_are_finite'"
+          " failed, but was skipped.",
+          all_prints,
       )
 
+  @parameterized.parameters(True, False)
   @mock_experiment_design_validation
   def test_experiment_data_metrics_must_be_non_negative_by_default(
-      self, mock_experiment_design
+      self, raise_on_failure, mock_experiment_design
   ):
     bad_experiment_data = pd.DataFrame({
         "date": pd.to_datetime(
-            ["2023-10-01", "2023-10-01", "2023-10-02", "2023-10-02"]
+            ["2023-10-01", "2023-10-01", "2023-10-08", "2023-10-08"]
         ),
         "week_id": [1, 1, 2, 2],
         "item_id": ["1", "2", "1", "2"],
@@ -900,23 +1202,46 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         **self.irrelevant_design_args
     )
 
-    with self.assertRaises(ValueError):
-      data_preparation.validate_experiment_data(
-          bad_experiment_data,
-          design=design,
-          item_id_column="item_id",
-          date_column="date",
-          week_id_column="week_id",
-          metric_columns=["clicks", "impressions"],
-          experiment_start_date="2023-10-01",
-          treatment_assignment_column="treatment_assignment",
+    if raise_on_failure:
+      with self.assertRaises(ValueError):
+        data_preparation.validate_experiment_data(
+            bad_experiment_data,
+            design=design,
+            item_id_column="item_id",
+            date_column="date",
+            week_id_column="week_id",
+            metric_columns=["clicks", "impressions"],
+            experiment_start_date="2023-10-01",
+            treatment_assignment_column="treatment_assignment",
+        )
+    else:
+      with mock.patch("builtins.print") as mock_print:
+        data_preparation.validate_experiment_data(
+            bad_experiment_data,
+            design=design,
+            item_id_column="item_id",
+            date_column="date",
+            week_id_column="week_id",
+            metric_columns=["clicks", "impressions"],
+            experiment_start_date="2023-10-01",
+            treatment_assignment_column="treatment_assignment",
+            skip_validation_checks=["all_metrics_are_non_negative"],
+        )
+      all_prints = " ".join([call[0][0] for call in mock_print.call_args_list])
+      self.assertIn(
+          "WARNING: Validation check 'all_metrics_are_non_negative'"
+          " failed, but was skipped.",
+          all_prints,
       )
 
+  @parameterized.parameters(True, False)
   @mock_experiment_design_validation
-  def test_number_of_items_must_match_design(self, mock_experiment_design):
+  def test_number_of_items_must_match_design(
+      self, raise_on_failure, mock_experiment_design
+  ):
     experiment_data = pd.DataFrame({
         "date": pd.to_datetime(
-            ["2023-10-01", "2023-10-01", "2023-10-02", "2023-10-02"]
+            ["2023-10-01", "2023-10-01", "2023-10-08", "2023-10-08"]
         ),
         "week_id": [1, 1, 2, 2],
         "item_id": ["1", "2", "1", "2"],
@@ -930,20 +1255,41 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         pretest_weeks=0,
         **self.irrelevant_design_args
     )
-    with self.assertRaises(ValueError):
-      data_preparation.validate_experiment_data(
-          experiment_data,
-          design=design,
-          item_id_column="item_id",
-          date_column="date",
-          week_id_column="week_id",
-          metric_columns=["clicks", "impressions"],
-          experiment_start_date="2023-10-01",
-          treatment_assignment_column="treatment_assignment",
+
+    if raise_on_failure:
+      with self.assertRaises(ValueError):
+        data_preparation.validate_experiment_data(
+            experiment_data,
+            design=design,
+            item_id_column="item_id",
+            date_column="date",
+            week_id_column="week_id",
+            metric_columns=["clicks", "impressions"],
+            experiment_start_date="2023-10-01",
+            treatment_assignment_column="treatment_assignment",
+        )
+    else:
+      with mock.patch("builtins.print") as mock_print:
+        data_preparation.validate_experiment_data(
+            experiment_data,
+            design=design,
+            item_id_column="item_id",
+            date_column="date",
+            week_id_column="week_id",
+            metric_columns=["clicks", "impressions"],
+            experiment_start_date="2023-10-01",
+            treatment_assignment_column="treatment_assignment",
+            skip_validation_checks=["number_of_items_matches_design"],
+        )
+      all_prints = " ".join([call[0][0] for call in mock_print.call_args_list])
+      self.assertIn(
+          "WARNING: Validation check 'number_of_items_matches_design'"
+          " failed, but was skipped.",
+          all_prints,
       )
 
   @mock_experiment_design_validation
-  def test_experiment_data_metrics_may_be_non_negative_if_require_positive_primary_metric_is_false(
+  def test_experiment_data_metrics_may_be_non_negative_if_included_in_can_be_negative_metrics(
       self, mock_experiment_design
   ):
     good_experiment_data = pd.DataFrame({
@@ -975,17 +1321,19 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         treatment_assignment_column="treatment_assignment",
     )
 
+  @parameterized.parameters(True, False)
   @mock_experiment_design_validation
   def test_experiment_data_week_id_must_be_consecutive(
-      self, mock_experiment_design
+      self, raise_on_failure, mock_experiment_design
   ):
     bad_experiment_data = pd.DataFrame({
         "date": pd.to_datetime(
-            ["2023-10-01", "2023-10-01", "2023-10-02", "2023-10-02"]
+            ["2023-10-01", "2023-10-01", "2023-10-08", "2023-10-08"]
         ),
         "week_id": [1, 1, 3, 3],
         "item_id": ["1", "2", "1", "2"],
         "clicks": [1, 2, 3, 1],
+        "impressions": [10, 12, 13, 14],
         "treatment_assignment": [0, 1, 0, 1],
     })
     design = experiment_design.ExperimentDesign(
@@ -995,16 +1343,36 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         **self.irrelevant_design_args
     )
 
-    with self.assertRaises(ValueError):
-      data_preparation.validate_experiment_data(
-          bad_experiment_data,
-          design=design,
-          item_id_column="item_id",
-          date_column="date",
-          week_id_column="week_id",
-          metric_columns=["clicks", "impressions"],
-          experiment_start_date="2023-10-01",
-          treatment_assignment_column="treatment_assignment",
+    if raise_on_failure:
+      with self.assertRaises(ValueError):
+        data_preparation.validate_experiment_data(
+            bad_experiment_data,
+            design=design,
+            item_id_column="item_id",
+            date_column="date",
+            week_id_column="week_id",
+            metric_columns=["clicks", "impressions"],
+            experiment_start_date="2023-10-01",
+            treatment_assignment_column="treatment_assignment",
+        )
+    else:
+      with mock.patch("builtins.print") as mock_print:
+        data_preparation.validate_experiment_data(
+            bad_experiment_data,
+            design=design,
+            item_id_column="item_id",
+            date_column="date",
+            week_id_column="week_id",
+            metric_columns=["clicks", "impressions"],
+            experiment_start_date="2023-10-01",
+            treatment_assignment_column="treatment_assignment",
+            skip_validation_checks=["week_ids_are_consecutive_integers"],
+        )
+      all_prints = " ".join([call[0][0] for call in mock_print.call_args_list])
+      self.assertIn(
+          "WARNING: Validation check 'week_ids_are_consecutive_integers'"
+          " failed, but was skipped.",
+          all_prints,
       )
 
   @mock_experiment_design_validation
@@ -1013,7 +1381,7 @@ class ValidateExperimentDataTests(parameterized.TestCase):
   ):
     bad_experiment_data = pd.DataFrame({
         "date": pd.to_datetime(
-            ["2023-10-01", "2023-10-01", "2023-10-02", "2023-10-02"]
+            ["2023-10-01", "2023-10-01", "2023-10-08", "2023-10-08"]
         ),
         "week_id": ["1", "1", "2", "2"],
         "item_id": ["1", "2", "1", "2"],
@@ -1039,8 +1407,11 @@ class ValidateExperimentDataTests(parameterized.TestCase):
           treatment_assignment_column="treatment_assignment",
       )
 
+  @parameterized.parameters(True, False)
   @mock_experiment_design_validation
-  def test_earliest_date_must_match_design(self, mock_experiment_design):
+  def test_earliest_date_must_match_design(
+      self, raise_on_failure, mock_experiment_design
+  ):
     experiment_data = pd.DataFrame({
         "date": pd.to_datetime(
             ["2023-10-01", "2023-10-01", "2023-10-08", "2023-10-08"]
@@ -1057,20 +1428,44 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         pretest_weeks=1,  # Requiring 1 week of pre-test but it's not in data
         **self.irrelevant_design_args
     )
-    with self.assertRaises(ValueError):
-      data_preparation.validate_experiment_data(
-          experiment_data,
-          design=design,
-          item_id_column="item_id",
-          date_column="date",
-          week_id_column="week_id",
-          metric_columns=["clicks", "impressions"],
-          experiment_start_date="2023-10-01",
-          treatment_assignment_column="treatment_assignment",
+
+    if raise_on_failure:
+      with self.assertRaises(ValueError):
+        data_preparation.validate_experiment_data(
+            experiment_data,
+            design=design,
+            item_id_column="item_id",
+            date_column="date",
+            week_id_column="week_id",
+            metric_columns=["clicks", "impressions"],
+            experiment_start_date="2023-10-01",
+            treatment_assignment_column="treatment_assignment",
+        )
+    else:
+      with mock.patch("builtins.print") as mock_print:
+        data_preparation.validate_experiment_data(
+            experiment_data,
+            design=design,
+            item_id_column="item_id",
+            date_column="date",
+            week_id_column="week_id",
+            metric_columns=["clicks", "impressions"],
+            experiment_start_date="2023-10-01",
+            treatment_assignment_column="treatment_assignment",
+            skip_validation_checks=["experiment_dates_match_design"],
+        )
+      all_prints = " ".join([call[0][0] for call in mock_print.call_args_list])
+      self.assertIn(
+          "WARNING: Validation check 'experiment_dates_match_design'"
+          " failed, but was skipped.",
+          all_prints,
       )
 
+  @parameterized.parameters(True, False)
   @mock_experiment_design_validation
-  def test_last_date_must_match_design(self, mock_experiment_design):
+  def test_last_date_must_match_design(
+      self, raise_on_failure, mock_experiment_design
+  ):
     experiment_data = pd.DataFrame({
         "date": pd.to_datetime(
             ["2023-10-01", "2023-10-01", "2023-10-08", "2023-10-08"]
@@ -1087,16 +1482,37 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         pretest_weeks=0,
         **self.irrelevant_design_args
     )
-    with self.assertRaises(ValueError):
-      data_preparation.validate_experiment_data(
-          experiment_data,
-          design=design,
-          item_id_column="item_id",
-          date_column="date",
-          week_id_column="week_id",
-          metric_columns=["clicks", "impressions"],
-          experiment_start_date="2023-10-01",
-          treatment_assignment_column="treatment_assignment",
+
+    if raise_on_failure:
+      with self.assertRaises(ValueError):
+        data_preparation.validate_experiment_data(
+            experiment_data,
+            design=design,
+            item_id_column="item_id",
+            date_column="date",
+            week_id_column="week_id",
+            metric_columns=["clicks", "impressions"],
+            experiment_start_date="2023-10-01",
+            treatment_assignment_column="treatment_assignment",
+        )
+    else:
+      with mock.patch("builtins.print") as mock_print:
+        data_preparation.validate_experiment_data(
+            experiment_data,
+            design=design,
+            item_id_column="item_id",
+            date_column="date",
+            week_id_column="week_id",
+            metric_columns=["clicks", "impressions"],
+            experiment_start_date="2023-10-01",
+            treatment_assignment_column="treatment_assignment",
+            skip_validation_checks=["experiment_dates_match_design"],
+        )
+      all_prints = " ".join([call[0][0] for call in mock_print.call_args_list])
+      self.assertIn(
+          "WARNING: Validation check 'experiment_dates_match_design'"
+          " failed, but was skipped.",
+          all_prints,
       )
 
   @mock_experiment_design_validation
@@ -1131,9 +1547,10 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         treatment_assignment_column="treatment_assignment",
     )
 
+  @parameterized.parameters(True, False)
   @mock_experiment_design_validation
   def test_primary_metric_must_be_one_of_the_metrics(
-      self, mock_experiment_design
+      self, raise_on_failure, mock_experiment_design
   ):
     experiment_data = pd.DataFrame({
         "date": pd.to_datetime(
@@ -1151,21 +1568,43 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         pretest_weeks=0,
         **self.irrelevant_design_args
     )
-    with self.assertRaises(ValueError):
-      data_preparation.validate_experiment_data(
-          experiment_data,
-          design=design,
-          item_id_column="item_id",
-          date_column="date",
-          week_id_column="week_id",
-          metric_columns=["impressions"],
-          experiment_start_date="2023-10-01",
-          treatment_assignment_column="treatment_assignment",
+
+    if raise_on_failure:
+      with self.assertRaises(ValueError):
+        data_preparation.validate_experiment_data(
+            experiment_data,
+            design=design,
+            item_id_column="item_id",
+            date_column="date",
+            week_id_column="week_id",
+            metric_columns=["impressions"],
+            experiment_start_date="2023-10-01",
+            treatment_assignment_column="treatment_assignment",
+        )
+    else:
+      with mock.patch("builtins.print") as mock_print:
+        data_preparation.validate_experiment_data(
+            experiment_data,
+            design=design,
+            item_id_column="item_id",
+            date_column="date",
+            week_id_column="week_id",
+            metric_columns=["impressions"],
+            experiment_start_date="2023-10-01",
+            treatment_assignment_column="treatment_assignment",
+            skip_validation_checks=["primary_metric_in_metrics"],
+        )
+      all_prints = " ".join([call[0][0] for call in mock_print.call_args_list])
+      self.assertIn(
+          "WARNING: Validation check 'primary_metric_in_metrics'"
+          " failed, but was skipped.",
+          all_prints,
       )
 
+  @parameterized.parameters(True, False)
   @mock_experiment_design_validation
   def test_treatment_assignment_must_be_unique_for_each_item_id(
-      self, mock_experiment_design
+      self, raise_on_failure, mock_experiment_design
   ):
     experiment_data = pd.DataFrame({
         "date": pd.to_datetime(
@@ -1183,21 +1622,48 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         pretest_weeks=0,
         **self.irrelevant_design_args
     )
-    with self.assertRaises(ValueError):
-      data_preparation.validate_experiment_data(
-          experiment_data,
-          design=design,
-          item_id_column="item_id",
-          date_column="date",
-          week_id_column="week_id",
-          metric_columns=["clicks", "impressions"],
-          experiment_start_date="2023-10-01",
-          treatment_assignment_column="treatment_assignment",
+
+    if raise_on_failure:
+      with self.assertRaises(ValueError):
+        data_preparation.validate_experiment_data(
+            experiment_data,
+            design=design,
+            item_id_column="item_id",
+            date_column="date",
+            week_id_column="week_id",
+            metric_columns=["clicks", "impressions"],
+            experiment_start_date="2023-10-01",
+            treatment_assignment_column="treatment_assignment",
+            skip_validation_checks=["coinflip_salt_validation"],
+        )
+    else:
+      with mock.patch("builtins.print") as mock_print:
+        data_preparation.validate_experiment_data(
+            experiment_data,
+            design=design,
+            item_id_column="item_id",
+            date_column="date",
+            week_id_column="week_id",
+            metric_columns=["clicks", "impressions"],
+            experiment_start_date="2023-10-01",
+            treatment_assignment_column="treatment_assignment",
+            skip_validation_checks=[
+                "treatment_assignment_is_unique",
+                "coinflip_salt_validation",
+            ],
+        )
+      all_prints = " ".join([call[0][0] for call in mock_print.call_args_list])
+      self.assertIn(
+          "WARNING: Validation check"
+          " 'treatment_assignment_is_unique' failed, but"
+          " was skipped.",
+          all_prints,
       )
 
+  @parameterized.parameters(True, False)
   @mock_experiment_design_validation
   def test_treatment_assignment_must_match_whats_expected_from_coinflip_salt(
-      self, mock_experiment_design
+      self, raise_on_failure, mock_experiment_design
   ):
     experiment_data = pd.DataFrame({
         "date": pd.to_datetime(
@@ -1215,55 +1681,48 @@ class ValidateExperimentDataTests(parameterized.TestCase):
         pretest_weeks=0,
         **self.irrelevant_design_args
     )
-    with self.assertRaises(ValueError):
-      data_preparation.validate_experiment_data(
-          experiment_data,
-          design=design,
-          item_id_column="item_id",
-          date_column="date",
-          week_id_column="week_id",
-          metric_columns=["clicks", "impressions"],
-          experiment_start_date="2023-10-01",
-          treatment_assignment_column="treatment_assignment",
+
+    if raise_on_failure:
+      with self.assertRaises(ValueError):
+        data_preparation.validate_experiment_data(
+            experiment_data,
+            design=design,
+            item_id_column="item_id",
+            date_column="date",
+            week_id_column="week_id",
+            metric_columns=["clicks", "impressions"],
+            experiment_start_date="2023-10-01",
+            treatment_assignment_column="treatment_assignment",
+            skip_validation_checks=["no_sample_ratio_mismatch"],
+        )
+    else:
+      with mock.patch("builtins.print") as mock_print:
+        data_preparation.validate_experiment_data(
+            experiment_data,
+            design=design,
+            item_id_column="item_id",
+            date_column="date",
+            week_id_column="week_id",
+            metric_columns=["clicks", "impressions"],
+            experiment_start_date="2023-10-01",
+            treatment_assignment_column="treatment_assignment",
+            skip_validation_checks=[
+                "coinflip_salt_validation",
+                "no_sample_ratio_mismatch",
+            ],
+        )
+      all_prints = " ".join([call[0][0] for call in mock_print.call_args_list])
+      self.assertIn(
+          "WARNING: Validation check 'coinflip_salt_validation'"
+          " failed, but was skipped.",
+          all_prints,
       )
 
   @mock_experiment_design_validation
-  def test_coinflip_salt_not_checked_if_included_in_skip_validation_checks(
-      self, mock_experiment_design
-  ):
-    experiment_data = pd.DataFrame({
-        "date": pd.to_datetime(
-            ["2023-10-01", "2023-10-01", "2023-10-08", "2023-10-08"]
-        ),
-        "week_id": [1, 1, 2, 2],
-        "item_id": ["1", "2", "1", "2"],
-        "clicks": [1, 2, 3, 4],
-        "impressions": [10, 12, 13, 14],
-        "treatment_assignment": [1, 0, 1, 0],  # Different to expected from salt
-    })
-    design = experiment_design.ExperimentDesign(
-        n_items_before_trimming=2,
-        runtime_weeks=2,
-        pretest_weeks=0,
-        **self.irrelevant_design_args
-    )
-
-    data_preparation.validate_experiment_data(
-        experiment_data,
-        design=design,
-        item_id_column="item_id",
-        date_column="date",
-        week_id_column="week_id",
-        metric_columns=["clicks", "impressions"],
-        experiment_start_date="2023-10-01",
-        treatment_assignment_column="treatment_assignment",
-        skip_validation_checks=[
-            data_preparation.ValidationChecks.COINFLIP_SALT_VALIDATION
-        ],
-    )
-
-  @mock_experiment_design_validation
   def test_sample_ratio_mismatch_is_checked(self, mock_experiment_design):
+    # Not testing the validation itself because it has it's own set of tests in
+    # SampleRatioMismatchValidationTests.
+
     experiment_data = pd.DataFrame({
         "date": pd.to_datetime(
             ["2023-10-01", "2023-10-01", "2023-10-08", "2023-10-08"]
@@ -1295,7 +1754,10 @@ class ValidateExperimentDataTests(parameterized.TestCase):
           treatment_assignment_column="treatment_assignment",
       )
       mock_validate_no_sample_ratio_mismatch.assert_called_with(
-          experiment_data, "item_id", "treatment_assignment"
+          experiment_data,
+          "item_id",
+          "treatment_assignment",
+          skip_validation_checks=None,
       )
 
 
