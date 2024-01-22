@@ -62,22 +62,24 @@ from feedx import experiment_simulations
 
 rng = np.random.default_rng(1234) # Seed to make analysis reproducable
 
-# Load your historical performance data with columns item_id, week_number, 
-# week_start and clicks as a pandas dataframe
-historical_data = ...
+# Generate synthetic data for the example. Should be replaced with real data
+# for an actual use-case.
+raw_data = data_preparation.generate_synthetic_data(rng=rng)
 
-# Validate that the historical data meets the requirements for the analysis
-data_preparation.validate_historical_data(
-  historical_data,
-  item_id_column="item_id",
-  date_column="week_start",
-  date_id_column="week_number",
-  primary_metric_column="clicks",
+# Format the data in preparation for the analysis, and perform data 
+# validation checks.
+historical_data = data_preparation.prepare_and_validate_historical_data(
+    raw_data,
+    item_id_column="item_id",
+    date_column="date",
+    primary_metric="clicks",
+    primary_metric_column="clicks",
+    rng=RNG
 )
 
 # Define the experiment design
 design = experiment_design.ExperimentDesign(
-  n_items_before_trimming=2000,
+  n_items_before_trimming=7000,
   runtime_weeks=8,
   pretest_weeks=4,
   is_crossover=True,
@@ -92,18 +94,18 @@ design = experiment_design.ExperimentDesign(
 minimum_start_week = experiment_simulations.calculate_minimum_start_week_id(
   candidate_runtime_weeks=[8],
   candidate_pretest_weeks=[4],
-  historical_week_ids=historical_data["week_number"].unique()
+  historical_week_ids=historical_data["week_id"].unique()
 )
 analysis = experiment_simulations.SimulationAnalysis(
   design=design,
   historical_data=historical_data.copy(),
   item_id_column="item_id",
-  week_id_column="week_number",
+  week_id_column="week_id",
   minimum_start_week_id=minimum_start_week,
   rng=rng
 )
 analysis.estimate_minimum_detectable_effect()
-analysis.validate(n_simulations=1000)
+analysis.validate_design(n_simulations=1000)
 
 # Print the results
 if not analysis.all_robustness_checks_pass:
