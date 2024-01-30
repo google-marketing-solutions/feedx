@@ -14,10 +14,14 @@
 
 """Plot historical and simulation data."""
 
+import datetime as dt
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from scipy import stats
 
+from feedx import experiment_design
 from feedx import experiment_simulations
 from feedx import statistics
 
@@ -254,3 +258,138 @@ def _add_cuped_adjusted_metric_per_date(
     )
 
   return data
+
+
+def plot_metric_over_time(
+    data: pd.DataFrame,
+    *,
+    metric_column: str,
+    item_id_column: str,
+    time_period_column: str,
+    treatment_assignment_column: str,
+    date_column: str,
+    design: experiment_design.ExperimentDesign,
+    apply_cuped_adjustment: bool = True,
+) -> tuple[plt.Figure, plt.Axes]:
+  """Plots the peformance of control and treatment groups over time for each metric.
+
+  Args:
+    data: the input data to plot
+    metric_column: name of the column with the metric to plot
+    item_id_column: name of the column with the item_ids
+    time_period_column: name of the column containing the test phases, eg
+      "pretest", "test_1", "washout_1"
+    treatment_assignment_column:
+    date_column: name of the column containing dates
+    design: experiment design selected for the experiment
+    apply_cuped_adjustment: if the function should apply CUPED adjustment before
+      plotting
+
+  Returns:
+    Plot showing the control and treatment performance over time and and the
+      difference between control and treatment for the selected metric.
+  """
+  data = data.sort_values(date_column)
+
+  if apply_cuped_adjustment:
+    data = _add_cuped_adjusted_metric_per_date(
+        data.copy(),
+        metric_column=metric_column,
+        item_id_column=item_id_column,
+        date_column=date_column,
+        time_period_column=time_period_column,
+        new_metric_column_name=metric_column,
+    )
+
+  values = pd.pivot_table(
+      data=data,
+      index=date_column,
+      columns=treatment_assignment_column,
+      values=metric_column,
+      aggfunc="mean",
+  ).rename({1: "Treatment", 0: "Control"}, axis=1)
+
+  values_std = pd.pivot_table(
+      data=data,
+      index=date_column,
+      columns=treatment_assignment_column,
+      values=metric_column,
+      aggfunc=lambda x: np.std(x) / np.sqrt(len(x)),
+  ).rename({1: "Treatment", 0: "Control"}, axis=1)
+
+  delta = values["Treatment"] - values["Control"]
+  delta_std = np.sqrt(values_std["Treatment"] ** 2 + values_std["Control"] ** 2)
+  z = stats.norm.ppf(1.0 - design.alpha / 2)
+  delta_lb = delta - z * delta_std
+  delta_ub = delta + z * delta_std
+
+  fig, ax = plt.subplots(
+      nrows=2, figsize=(10, 6), sharex=True, constrained_layout=True
+  )
+
+  is_test_or_test_1 = data["time_period"].isin(["test", "test_1"])
+  start_date = data.loc[is_test_or_test_1, "date"].min()
+  pretest_start_date = start_date - dt.timedelta(weeks=design.pretest_weeks)
+  end_date = start_date + dt.timedelta(weeks=design.runtime_weeks)
+
+  values.plot(lw=1, ax=ax[0], marker=".", label=metric_column.replace("_", " "))
+  title = f"Average {metric_column.replace('_', ' ')} per item"
+  if apply_cuped_adjustment:
+    title += " (cuped adjusted)"
+  ax[0].set_title(title)
+  ax[0].set_xlim(pretest_start_date, end_date)
+  ax[0].set_ylabel(metric_column.replace("_", " ").title())
+
+  delta.plot(lw=1, ax=ax[1], color="C2", marker=".", label="Treatment - Control")
+  ax[1].fill_between(
+      delta.index.values,
+      delta_lb,
+      delta_ub,
+      color="C2",
+      alpha=0.3,
+      label=f"{1.0 - design.alpha:.0%} Confidence Interval",
+    )
+  ax[1].axhline(0.0, color="k", lw=1, ls="--")
+  ax[1].set_xlabel("Date")
+  ax[1].set_xlim(pretest_start_date, end_date)
+  ax[1].set_ylabel("Treatment - Control")
+
+  if design.is_crossover:
+    test_period_weeks = (
+        design.runtime_weeks - 2 * design.crossover_washout_weeks) // 2
+    test_period_1_start = start_date + dt.timedelta(
+        weeks=design.crossover_washout_weeks
+    )
+    crossover = test_period_1_start + dt.timedelta(weeks=test_period_weeks)
+    test_period_2_start = crossover + dt.timedelta(
+        weeks=design.crossover_washout_weeks
+    )
+    ax[0].axvspan(
+        start_date, test_period_1_start, color="k", alpha=0.1, label="Washout"
+    )
+    ax[0].axvspan(crossover, test_period_2_start, color="k", alpha=0.1)
+    ax[0].axvline(start_date, color="k", label="Experiment Start")
+    ax[0].axvline(crossover, color="k", ls="--", label="Crossover")
+    ax[1].axvspan(
+        start_date, test_period_1_start, color="k", alpha=0.1, label="Washout"
+    )
+    ax[1].axvspan(crossover, test_period_2_start, color="k", alpha=0.1)
+    ax[1].axvline(start_date, color="k", label="Experiment Start")
+    ax[1].axvline(crossover, color="k", ls="--", label="Crossover")
+  else:
+    ax[0].axvline(start_date, color="k", label="Experiment Start")
+    ax[1].axvline(start_date, color="k", label="Experiment Start")
+
+  handles, labels = ax[0].get_legend_handles_labels()
+  handles1, labels1 = ax[1].get_legend_handles_labels()
+  index_of_delta_line = labels1.index("Treatment - Control")
+  index_of_delta_line_ci = labels1.index(
+      f"{1.0 - design.alpha:.0%} Confidence Interval"
+  )
+  handles.append(handles1[index_of_delta_line])
+  labels.append(labels1[index_of_delta_line])
+  handles.append(handles1[index_of_delta_line_ci])
+  labels.append(labels1[index_of_delta_line_ci])
+  ax[0].legend(handles, labels, loc="upper left", bbox_to_anchor=(1, 1))
+
+  return fig, ax

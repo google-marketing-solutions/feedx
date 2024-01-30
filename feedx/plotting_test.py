@@ -206,5 +206,204 @@ class AddCupedAdjustedMetricPerDateTest(parameterized.TestCase):
       )
 
 
+@dataclasses.dataclass
+class MockExperimentDesign:
+  runtime_weeks: int | None
+  pretest_weeks: int | None
+  crossover_washout_weeks: int | None
+  alpha: float | None
+  is_crossover: bool | None
+
+
+class PlotMetricOverTimeTest(parameterized.TestCase):
+
+  def setUp(self):
+    super().setUp()
+    runtime_weeks = 8
+    pretest_weeks = 2
+    crossover_washout_weeks = 1
+    alpha = 0.05
+    is_crossover = True
+
+    self.design_crossover = MockExperimentDesign(
+        runtime_weeks=runtime_weeks,
+        pretest_weeks=pretest_weeks,
+        crossover_washout_weeks=crossover_washout_weeks,
+        alpha=alpha,
+        is_crossover=is_crossover,
+    )
+    self.design_traditional = MockExperimentDesign(
+        runtime_weeks=runtime_weeks,
+        pretest_weeks=pretest_weeks,
+        crossover_washout_weeks=None,
+        alpha=alpha,
+        is_crossover=False,
+    )
+
+    self.tradtional_data = pd.DataFrame(
+        data={
+            "metric": [25, 26, 17, 28, 27, 29, 17, 28, 16, 34, 456, 34, 54, 56,
+                       23],
+            "item_id": ["A", "A", "A", "A", "A", "B", "B", "B", "B", "B", "C",
+                        "C", "C", "C", "C"],
+            "time_period": [
+                "pretest",
+                "test",
+                "test",
+                "test",
+                "test",
+                "pretest",
+                "test",
+                "test",
+                "test",
+                "test",
+                "pretest",
+                "test",
+                "test",
+                "test",
+                "test",
+            ],
+            "treatment_assignment": [
+                "Control",
+                "Control",
+                "Control",
+                "Control",
+                "Control",
+                "Treatment",
+                "Treatment",
+                "Treatment",
+                "Treatment",
+                "Treatment",
+                "Treatment",
+                "Treatment",
+                "Treatment",
+                "Treatment",
+                "Treatment",
+            ],
+            "date": [
+                "2024-01-01",
+                "2024-01-02",
+                "2024-01-03",
+                "2024-01-04",
+                "2024-01-05",
+                "2024-01-01",
+                "2024-01-02",
+                "2024-01-03",
+                "2024-01-04",
+                "2024-01-05",
+                "2024-01-01",
+                "2024-01-02",
+                "2024-01-03",
+                "2024-01-04",
+                "2024-01-05",
+            ],
+        }
+    )
+    self.tradtional_data["date"] = pd.to_datetime(
+        self.tradtional_data["date"]
+    )
+
+    self.crossover_data = pd.DataFrame(
+        data={
+            "metric": [25, 26, 17, 28, 27, 29, 17, 28, 16, 34, 456, 34, 54, 56,
+                       23],
+            "item_id": ["A", "A", "A", "A", "A", "B", "B", "B", "B", "B", "C",
+                        "C", "C", "C", "C"],
+            "time_period": [
+                "pretest",
+                "washout_1",
+                "test_1",
+                "washout_2",
+                "test_2",
+                "pretest",
+                "washout_1",
+                "test_1",
+                "washout_2",
+                "test_2",
+                "pretest",
+                "washout_1",
+                "test_1",
+                "washout_2",
+                "test_2",
+            ],
+            "treatment_assignment": [
+                "Control",
+                "Control",
+                "Control",
+                "Control",
+                "Control",
+                "Treatment",
+                "Treatment",
+                "Treatment",
+                "Treatment",
+                "Treatment",
+                "Control",
+                "Control",
+                "Control",
+                "Control",
+                "Control",
+            ],
+            "date": [
+                "2024-01-01",
+                "2024-01-02",
+                "2024-01-03",
+                "2024-01-04",
+                "2024-01-05",
+                "2024-01-01",
+                "2024-01-02",
+                "2024-01-03",
+                "2024-01-04",
+                "2024-01-05",
+                "2024-01-01",
+                "2024-01-02",
+                "2024-01-03",
+                "2024-01-04",
+                "2024-01-05",
+            ],
+        }
+    )
+    self.crossover_data["date"] = pd.to_datetime(
+        self.crossover_data["date"]
+    )
+
+  @parameterized.parameters(True, False)
+  def test_plot_metric_over_time_for_crossover_design(
+      self, apply_cuped_adjustment
+  ):
+    fig, ax = plotting.plot_metric_over_time(
+        data=self.crossover_data,
+        metric_column="metric",
+        item_id_column="item_id",
+        time_period_column="time_period",
+        treatment_assignment_column="treatment_assignment",
+        date_column="date",
+        design=self.design_crossover,
+        apply_cuped_adjustment=apply_cuped_adjustment,
+    )
+    self.assertIsInstance(fig, plt.Figure)
+    self.assertIsInstance(ax, np.ndarray)
+    self.assertIsInstance(ax[0], plt.Axes)
+    self.assertIsInstance(ax[1], plt.Axes)
+
+  @parameterized.parameters(True, False)
+  def test_plot_metric_over_time_for_traditional_design(
+      self, apply_cuped_adjustment
+  ):
+    fig, ax = plotting.plot_metric_over_time(
+        data=self.tradtional_data,
+        metric_column="metric",
+        item_id_column="item_id",
+        time_period_column="time_period",
+        treatment_assignment_column="treatment_assignment",
+        date_column="date",
+        design=self.design_traditional,
+        apply_cuped_adjustment=apply_cuped_adjustment,
+    )
+    self.assertIsInstance(fig, plt.Figure)
+    self.assertIsInstance(ax, np.ndarray)
+    self.assertIsInstance(ax[0], plt.Axes)
+    self.assertIsInstance(ax[1], plt.Axes)
+
+
 if __name__ == "__main__":
   absltest.main()
