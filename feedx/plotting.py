@@ -340,7 +340,9 @@ def plot_metric_over_time(
   ax[0].set_xlim(pretest_start_date, end_date)
   ax[0].set_ylabel(metric_column.replace("_", " ").title())
 
-  delta.plot(lw=1, ax=ax[1], color="C2", marker=".", label="Treatment - Control")
+  delta.plot(
+      lw=1, ax=ax[1], color="C2", marker=".", label="Treatment - Control"
+  )
   ax[1].fill_between(
       delta.index.values,
       delta_lb,
@@ -348,7 +350,7 @@ def plot_metric_over_time(
       color="C2",
       alpha=0.3,
       label=f"{1.0 - design.alpha:.0%} Confidence Interval",
-    )
+  )
   ax[1].axhline(0.0, color="k", lw=1, ls="--")
   ax[1].set_xlabel("Date")
   ax[1].set_xlim(pretest_start_date, end_date)
@@ -356,7 +358,8 @@ def plot_metric_over_time(
 
   if design.is_crossover:
     test_period_weeks = (
-        design.runtime_weeks - 2 * design.crossover_washout_weeks) // 2
+        design.runtime_weeks - 2 * design.crossover_washout_weeks
+    ) // 2
     test_period_1_start = start_date + dt.timedelta(
         weeks=design.crossover_washout_weeks
     )
@@ -393,3 +396,80 @@ def plot_metric_over_time(
   ax[0].legend(handles, labels, loc="upper left", bbox_to_anchor=(1, 1))
 
   return fig, ax
+
+
+def _plot_horizontal_error_bar_with_infs(
+    ax: plt.Axes,
+    y_position: str,
+    value: str,
+    value_lb: str,
+    value_ub: str,
+    errorbar_style: str | None = None,
+    **kwargs,
+) -> None:
+  """Plots the result ranges for each metric.
+
+  This function handles potential infinities that may appear in the results from
+  an experiment.
+
+  Args:
+    ax: axes that will contain the plot.
+    y_position: array containing the vertical position to place the error bars.
+    value: array of the results from the experiment for each metric
+    value_lb: the lower bound for each result (value)
+    value_ub: the upper bound for each result (value)
+    errorbar_style: value specifying the style of the errorbar
+    **kwargs: additional arguments for the errorbar
+  """
+  if len(y_position) == 0:
+    return
+
+  y_position = np.asarray(y_position)
+  value = np.asarray(value)
+  value_lb = np.asarray(value_lb)
+  value_ub = np.asarray(value_ub)
+
+  inf_lb = ~np.isfinite(value_lb)
+  inf_ub = ~np.isfinite(value_ub)
+
+  value = np.copy(value)
+  value[~np.isfinite(value)] = 0.0  # If unknown, assume 0 impact
+
+  value_err_lb = value - value_lb
+  value_err_ub = value_ub - value
+  value_err_lb[inf_lb] = (
+      0.0  # set to 0. Infinite error bars are plotted separately
+  )
+  value_err_ub[inf_ub] = 0.0
+
+  value_lb_max = np.min(value_lb[~inf_lb])
+  value_ub_max = np.max(value_ub[~inf_ub])
+
+  eb = ax.errorbar(
+      y=y_position, x=value, xerr=[value_err_lb, value_err_ub], **kwargs
+  )
+  if errorbar_style is not None:
+    eb[-1][0].set_linestyle(errorbar_style)
+
+  kwargs["ms"] = 0
+  if np.sum(inf_lb) > 0:
+    eb = ax.errorbar(
+        y=y_position[inf_lb],
+        x=value[inf_lb],
+        xerr=value[inf_lb] - value_lb_max,
+        xuplims=True,
+        **kwargs,
+    )
+    if errorbar_style is not None:
+      eb[-1][0].set_linestyle(errorbar_style)
+
+  if np.sum(inf_ub) > 0:
+    eb = ax.errorbar(
+        y=y_position[inf_ub],
+        x=value[inf_ub],
+        xerr=value_ub_max - value[inf_ub],
+        xlolims=True,
+        **kwargs,
+    )
+    if errorbar_style is not None:
+      eb[-1][0].set_linestyle(errorbar_style)
