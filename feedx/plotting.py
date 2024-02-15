@@ -16,7 +16,9 @@
 
 import datetime as dt
 
+from matplotlib.lines import Line2D
 import matplotlib.pyplot as plt
+import matplotlib.ticker as mtick
 import numpy as np
 import pandas as pd
 from scipy import stats
@@ -400,10 +402,10 @@ def plot_metric_over_time(
 
 def _plot_horizontal_error_bar_with_infs(
     ax: plt.Axes,
-    y_position: str,
-    value: str,
-    value_lb: str,
-    value_ub: str,
+    y_position: list[float],
+    value: list[float],
+    value_lb: list[float],
+    value_ub: list[float],
     errorbar_style: str | None = None,
     **kwargs,
 ) -> None:
@@ -473,3 +475,156 @@ def _plot_horizontal_error_bar_with_infs(
     )
     if errorbar_style is not None:
       eb[-1][0].set_linestyle(errorbar_style)
+
+
+def plot_effects(
+    data: pd.DataFrame,
+    metric_column_name: str,
+    relative_difference_column_name: str,
+    relative_difference_lower_bound_column_name: str,
+    relative_difference_upper_bound_column_name: str,
+    is_significant_column_name: str,
+    design: experiment_design.ExperimentDesign,
+) -> np.ndarray:
+  """Plots the effects of the experiment for each metric provided.
+
+  This function displays the confidence intervals per metric and indicates which
+  results are statistically significant.
+
+  Args:
+    data: Experiment results containing the point estimate of the relative
+      differences, their upper and lower bounds, and if the results are
+      significant for each metric provided.
+    metric_column_name: Name of the column containing the metric name.
+    relative_difference_column_name: Name of the column containing the point
+      estimated of the relative difference between the two samples.
+    relative_difference_lower_bound_column_name: Name of the column containing
+      the lower bound of the relative difference between the two samples.
+    relative_difference_upper_bound_column_name: Name of the column containing
+      the upper bound of the relative difference between the two samples.
+    is_significant: If the test is statistically significant for the given
+      metric.
+
+  Returns:
+    A plot showing the experiment result of the primary and additional metrics
+  """
+  # Identify the primary metric in experiment results using the selected design
+  metrics = data.reset_index()[metric_column_name]
+  is_primary_metric = (
+      metrics.str.lower() == design.primary_metric.lower()
+  ).values
+
+  # If there is no primary metric in the experiment results, raise error
+  if np.sum(is_primary_metric) != 1:
+    raise ValueError(
+        f"Primary metric from design {design.primary_metric.lower()} missing"
+        " from data."
+    )
+
+  x = metrics.loc[~is_primary_metric].astype("category").cat.codes.values
+  x_labels = (
+      metrics.loc[~is_primary_metric].astype("category").cat.categories.values
+  )
+
+  y = data.loc[~is_primary_metric, relative_difference_column_name].values
+  y_lb = data.loc[
+      ~is_primary_metric, relative_difference_lower_bound_column_name
+  ].values
+  y_ub = data.loc[
+      ~is_primary_metric, relative_difference_upper_bound_column_name
+  ].values
+
+  is_significant = data.loc[
+      ~is_primary_metric, is_significant_column_name
+  ].values
+
+  x_labels_primary = metrics.loc[is_primary_metric]
+  y_primary = data.loc[
+      is_primary_metric, relative_difference_column_name
+  ].values
+  y_primary_lb = data.loc[
+      is_primary_metric, relative_difference_lower_bound_column_name
+  ].values
+  y_primary_ub = data.loc[
+      is_primary_metric, relative_difference_upper_bound_column_name
+  ].values
+  primary_is_significant = data.loc[
+      is_primary_metric, is_significant_column_name
+  ].values[0]
+
+  _, axs = plt.subplots(
+      nrows=2,
+      sharex=True,
+      height_ratios=[1, len(metrics) - 1],
+      figsize=(10, 4),
+      constrained_layout=True,
+  )
+
+  if primary_is_significant:
+    _plot_horizontal_error_bar_with_infs(
+        ax=axs[0],
+        y_position=[0],
+        value=y_primary,
+        value_lb=y_primary_lb,
+        value_ub=y_primary_ub,
+        fmt=".C1",
+    )
+  else:
+    _plot_horizontal_error_bar_with_infs(
+        ax=axs[0],
+        y_position=[0],
+        value=y_primary,
+        value_lb=y_primary_lb,
+        value_ub=y_primary_ub,
+        errorbar_style="--",
+        fmt=".C1",
+        alpha=0.3,
+    )
+
+  axs[0].set_yticks([0], x_labels_primary)
+  axs[0].set_title("Primary metric")
+  axs[0].grid(axis="x")
+  axs[0].axvline(0.0, color="k", lw=1)
+
+  _plot_horizontal_error_bar_with_infs(
+      ax=axs[1],
+      y_position=x[is_significant],
+      value=y[is_significant],
+      value_lb=y_lb[is_significant],
+      value_ub=y_ub[is_significant],
+      fmt=".C0",
+  )
+  _plot_horizontal_error_bar_with_infs(
+      ax=axs[1],
+      y_position=x[~is_significant],
+      value=y[~is_significant],
+      value_lb=y_lb[~is_significant],
+      value_ub=y_ub[~is_significant],
+      errorbar_style="--",
+      fmt=".C0",
+      alpha=0.3,
+  )
+
+  axs[1].set_yticks(np.arange(len(x_labels)), x_labels)
+  axs[1].axvline(0.0, color="k", lw=1)
+  axs[1].set_xlabel("Relative Effect Size")
+  axs[1].xaxis.set_major_formatter(
+      mtick.FuncFormatter(lambda x, pos: f"{x:+.1%}")
+  )
+  axs[1].set_title("Secondary metrics")
+  axs[1].grid(axis="x")
+
+  # Add legend
+  legend_lines = [
+      Line2D([0], [0], color="k", lw=1),
+      Line2D([0], [0], color="k", lw=1, ls="--", alpha=0.3),
+  ]
+  axs[0].legend(
+      legend_lines,
+      ["True", "False"],
+      title="Is statistically significant?",
+      loc="upper left",
+      bbox_to_anchor=(1, 1.5),
+  )
+
+  return axs

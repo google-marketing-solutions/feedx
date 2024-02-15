@@ -242,10 +242,40 @@ class PlotMetricOverTimeTest(parameterized.TestCase):
 
     self.tradtional_data = pd.DataFrame(
         data={
-            "metric": [25, 26, 17, 28, 27, 29, 17, 28, 16, 34, 456, 34, 54, 56,
-                       23],
-            "item_id": ["A", "A", "A", "A", "A", "B", "B", "B", "B", "B", "C",
-                        "C", "C", "C", "C"],
+            "metric": [
+                25,
+                26,
+                17,
+                28,
+                27,
+                29,
+                17,
+                28,
+                16,
+                34,
+                456,
+                34,
+                54,
+                56,
+                23,
+            ],
+            "item_id": [
+                "A",
+                "A",
+                "A",
+                "A",
+                "A",
+                "B",
+                "B",
+                "B",
+                "B",
+                "B",
+                "C",
+                "C",
+                "C",
+                "C",
+                "C",
+            ],
             "time_period": [
                 "pretest",
                 "test",
@@ -299,16 +329,44 @@ class PlotMetricOverTimeTest(parameterized.TestCase):
             ],
         }
     )
-    self.tradtional_data["date"] = pd.to_datetime(
-        self.tradtional_data["date"]
-    )
+    self.tradtional_data["date"] = pd.to_datetime(self.tradtional_data["date"])
 
     self.crossover_data = pd.DataFrame(
         data={
-            "metric": [25, 26, 17, 28, 27, 29, 17, 28, 16, 34, 456, 34, 54, 56,
-                       23],
-            "item_id": ["A", "A", "A", "A", "A", "B", "B", "B", "B", "B", "C",
-                        "C", "C", "C", "C"],
+            "metric": [
+                25,
+                26,
+                17,
+                28,
+                27,
+                29,
+                17,
+                28,
+                16,
+                34,
+                456,
+                34,
+                54,
+                56,
+                23,
+            ],
+            "item_id": [
+                "A",
+                "A",
+                "A",
+                "A",
+                "A",
+                "B",
+                "B",
+                "B",
+                "B",
+                "B",
+                "C",
+                "C",
+                "C",
+                "C",
+                "C",
+            ],
             "time_period": [
                 "pretest",
                 "washout_1",
@@ -362,9 +420,7 @@ class PlotMetricOverTimeTest(parameterized.TestCase):
             ],
         }
     )
-    self.crossover_data["date"] = pd.to_datetime(
-        self.crossover_data["date"]
-    )
+    self.crossover_data["date"] = pd.to_datetime(self.crossover_data["date"])
 
   @parameterized.parameters(True, False)
   def test_plot_metric_over_time_for_crossover_design(
@@ -403,6 +459,102 @@ class PlotMetricOverTimeTest(parameterized.TestCase):
     self.assertIsInstance(ax, np.ndarray)
     self.assertIsInstance(ax[0], plt.Axes)
     self.assertIsInstance(ax[1], plt.Axes)
+
+
+@dataclasses.dataclass
+class MockExperimentDesignPlot:
+  primary_metric: str | None
+
+
+class PlotEffectsTest(parameterized.TestCase):
+
+  def setUp(self):
+    super().setUp()
+    self.mock_results = pd.DataFrame({
+        "metric": [
+            "Clicks",
+            "Impressions",
+            "Clicks (no trimm)",
+            "CTR",
+            "CTR (no trim)",
+        ],
+        "relative_difference": [
+            -0.07524271844660191,
+            0.03679458239277644,
+            -0.07626086956521705,
+            -0.14394918600457385,
+            -0.11135639199612779,
+        ],
+        "relative_difference_lower_bound": [
+            -0.25911816160063605,
+            -0.11515822156081912,
+            -0.2449530881288059,
+            -0.3553351642938345,
+            -0.30461303788372396,
+        ],
+        "relative_difference_upper_bound": [
+            0.15250922160717417,
+            0.21735176439251713,
+            0.13013226417039925,
+            0.15011624918105748,
+            0.14331357952247625,
+        ],
+        "is_significant": [True, False, True, False, False],
+    })
+
+    self.mock_design = MockExperimentDesignPlot(primary_metric="clicks")
+    self.mock_design_none = MockExperimentDesignPlot(
+        primary_metric="conversions"
+    )
+
+  def test_plot_effects_returns_2_axes(self):
+    ax = plotting.plot_effects(
+        self.mock_results,
+        metric_column_name="metric",
+        relative_difference_column_name="relative_difference",
+        relative_difference_lower_bound_column_name=(
+            "relative_difference_lower_bound"
+        ),
+        relative_difference_upper_bound_column_name=(
+            "relative_difference_upper_bound"
+        ),
+        is_significant_column_name="is_significant",
+        design=self.mock_design,
+    )
+    self.assertTupleEqual(ax.shape, (2,))
+
+  def test_plot_effects_returns_array_of_axes(self):
+    ax = plotting.plot_effects(
+        self.mock_results,
+        metric_column_name="metric",
+        relative_difference_column_name="relative_difference",
+        relative_difference_lower_bound_column_name=(
+            "relative_difference_lower_bound"
+        ),
+        relative_difference_upper_bound_column_name=(
+            "relative_difference_upper_bound"
+        ),
+        is_significant_column_name="is_significant",
+        design=self.mock_design,
+    )
+    self.assertIsInstance(ax[0], plt.Axes)
+    self.assertIsInstance(ax[1], plt.Axes)
+
+  def test_raises_exception_if_no_primary_metric(self):
+    with self.assertRaises(ValueError):
+      plotting.plot_effects(
+          self.mock_results,
+          metric_column_name="metric",
+          relative_difference_column_name="relative_difference",
+          relative_difference_lower_bound_column_name=(
+              "relative_difference_lower_bound"
+          ),
+          relative_difference_upper_bound_column_name=(
+              "relative_difference_upper_bound"
+          ),
+          is_significant_column_name="is_significant",
+          design=self.mock_design_none,
+      )
 
 
 if __name__ == "__main__":
