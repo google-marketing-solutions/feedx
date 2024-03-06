@@ -6,6 +6,7 @@
 [![PyPI](https://img.shields.io/pypi/v/feedx?logo=pypi&logoColor=white&style=flat)](https://pypi.org/project/feedx/)
 [![GitHub last commit](https://img.shields.io/github/last-commit/google-marketing-solutions/feedx)](https://github.com/google-marketing-solutions/feedx/commits)
 [![Code Style: Google](https://img.shields.io/badge/code%20style-google-blueviolet.svg)](https://google.github.io/styleguide/pyguide.html)
+[![Recorded Training](https://img.shields.io/badge/Recorded_Training-grey?style=flat&logo=youtube&logoColor=red&labelColor=white)](https://marketingplatformacademy.withgoogle.com/events/tech-breakfast-training-series?talk=feedgen-and-feedx)
 [![Open in Colab](https://img.shields.io/badge/Experiment_Design_Colab-blue?style=flat&logo=google%20colab&labelColor=grey)](https://colab.research.google.com/github/google-marketing-solutions/feedx/blob/main/notebooks/01_experiment_designer.ipynb)
 [![Open in Colab](https://img.shields.io/badge/Experiment_Analysis_Colab-blue?style=flat&logo=google%20colab&labelColor=grey)](https://colab.research.google.com/github/google-marketing-solutions/feedx/blob/main/notebooks/02_experiment_analyzer.ipynb)
 
@@ -30,6 +31,8 @@ Having a high quality feed is crucial for high performing Shopping ads. If items
 FeedX consists of a Python package, containing all of the logic and mechanics, and a set of Colab notebooks which demonstrate how to use the package to design and analyze experiments.  
 
 FeedX is the recommended testing methodology for [FeedGen](https://github.com/google-marketing-solutions/feedgen). You can see a successful example of FeedX and FeedGen in the Think With Google article [Generative AI: Home24 improves the reach and performance of shopping ads with FeedGen](https://www.thinkwithgoogle.com/intl/de-de/marketing-strategien/automatisierung/home24-feedgen-shopping-ads/), where we were able to measure a 29% increase in clicks and a 25% increase in impressions.
+
+For more information on FeedX, check out our recorded training on the [Google Marketing Platform Academy](https://marketingplatformacademy.withgoogle.com/events/tech-breakfast-training-series?talk=feedgen-and-feedx).
 
 ## Getting Started
 
