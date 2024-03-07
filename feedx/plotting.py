@@ -37,6 +37,7 @@ def _make_density_plot(
     color: str = "C0",
     label: str | None = None,
     edgecolor: str | None = None,
+    histtype: str = "bar",
 ) -> None:
   """Make a density plot using matplotlib visualizing distribution of the metric.
 
@@ -49,6 +50,7 @@ def _make_density_plot(
     color: color in which to display the data in the plots
     label: optional value to override x_label in the plot legend
     edgecolor: color in which to display the edges of the density plots
+    histtype: the type of histogram to display
   """
   x_label = x_label or column
   y_label = y_label or "Number of Items"
@@ -56,7 +58,7 @@ def _make_density_plot(
   ax.hist(
       data[column],
       bins="auto",
-      histtype="bar",
+      histtype=histtype,
       alpha=0.5,
       color=color,
       label=label,
@@ -67,9 +69,85 @@ def _make_density_plot(
   ax.set_ylabel(f"{y_label}")
 
 
+def _make_cumulative_distribution_plot(
+    values: np.ndarray,
+    ax: plt.Axes,
+    x_label: str = "Metric average per item",
+    y_label: str = "Percentage of items (number of items)\non a logarithmic scale",
+    color: str = "C0",
+    label: str = "",
+) -> None:
+  """Add a cumulative distribution plot of the values provided to the axis.
+
+  This plots the fraction of items with that value or higher as a function of
+  the values.
+
+  Args:
+    values: Values to be plotted.
+    ax: Axes to contain the plot
+    x_label: The label for the x-axis.
+    y_label: The label for the y-axis.
+    color: The color of the line.
+    label: The label of the line for a legend.
+  """
+  values = np.sort(values)
+  y_number = len(values) - np.arange(len(values))
+  y_total = len(values)
+  y_percentage = y_number / y_total
+
+  ax.plot(values, y_percentage, f".-{color}", label=label, lw=1.5)
+
+  ax.set_yscale("log")
+  ax.set_xlabel(x_label)
+  ax.set_ylabel(y_label)
+  ax.yaxis.set_major_formatter(
+      mtick.FuncFormatter(
+          lambda x, pos: f"{x * 100:.3g}% ({round(x * y_total):,.0f})"
+      )
+  )
+
+
+def _make_lorenz_plot(
+    values: np.ndarray,
+    ax: plt.Axes,
+    x_label: str = "Cumulative share of items",
+    y_label: str = "Cumulative share of metric",
+    color: str = "C0",
+    label: str = "",
+) -> None:
+  """Add a lorenze plot of the values provided to the axis.
+
+  This plots the fraction of the metric that is captured by the top x% of the
+  items. More details at https://en.wikipedia.org/wiki/Lorenz_curve.
+
+  Args:
+    values: Values to be plotted.
+    ax: Axes to contain the plot
+    x_label: The label for the x-axis.
+    y_label: The label for the y-axis.
+    color: The color of the line.
+    label: The label of the line for a legend.
+  """
+
+  values = np.sort(values)[::-1]
+  x_percentage = (np.arange(len(values)) + 1) / len(values)
+  y_percentage = np.cumsum(values) / np.sum(values)
+
+  ax.plot(x_percentage, y_percentage, f".-{color}", label=label, lw=1.5)
+
+  ax.set_xscale("log")
+  ax.set_xlabel(x_label)
+  ax.set_ylabel(y_label)
+  ax.yaxis.set_major_formatter(mtick.PercentFormatter(xmax=1))
+  ax.xaxis.set_major_formatter(
+      mtick.FuncFormatter(lambda x, pos: f"{x * 100:.3g}%")
+  )
+
+
 def plot_metric_history(
     data: pd.DataFrame,
     metric_column: str,
+    item_id_column: str = "item_id",
     week_start_column_name: str = "week_start",
 ) -> np.ndarray:
   """Plots the weekly distribution and the average of the metric per item per week.
@@ -78,6 +156,7 @@ def plot_metric_history(
     data: data set to plot containing the week_start column and the metrics that
       will be evaluated
     metric_column: metric chosen to run the plot
+    item_id_column: the column containing the item id
     week_start_column_name: column containing the week start date
 
   Returns:
@@ -85,7 +164,7 @@ def plot_metric_history(
   """
 
   _, axs = plt.subplots(
-      nrows=1, ncols=2, figsize=(15, 5), constrained_layout=True
+      nrows=1, ncols=3, figsize=(15, 5), constrained_layout=True
   )
 
   clean_metric_name = metric_column.replace("_", " ")
@@ -93,16 +172,38 @@ def plot_metric_history(
   metric_time = (
       data.groupby(week_start_column_name)[[metric_column]].sum().reset_index()
   )
-  axs[0].plot(metric_time[week_start_column_name], metric_time[metric_column])
+  axs[0].plot(
+      metric_time[week_start_column_name],
+      metric_time[metric_column],
+      marker=".",
+      lw=1.5,
+  )
   axs[0].set_title(f"Total {clean_metric_name} per week")
   axs[0].set(xlabel="Start Week", ylabel=f"Total {clean_metric_name}")
   axs[0].tick_params(axis="x", rotation=30)
 
-  _make_density_plot(
-      data,
-      ax=axs[1],
-      column=metric_column,
+  metric_per_item = data.groupby(item_id_column)[metric_column].mean()
+
+  _make_cumulative_distribution_plot(
+      metric_per_item.values,
+      axs[1],
       x_label=f"Average {clean_metric_name} per item per week",
+      y_label="Percentage of items (number of items)",
+  )
+  axs[1].set_title(
+      f"Percentage of items with this many {clean_metric_name} or more\non"
+      " average per week"
+  )
+
+  _make_lorenz_plot(
+      metric_per_item.values,
+      axs[2],
+      x_label="Percentage of items",
+      y_label=f"Percentage of {clean_metric_name}",
+  )
+  axs[2].set_title(
+      f"Lorenz curve\nWhat percentage of {clean_metric_name} are\ncaptured by"
+      " the top x% of items."
   )
 
   return axs
@@ -148,6 +249,8 @@ def plot_deep_dive(
       color="C0",
       ax=ax[0],
       label="A/A absolute difference",
+      edgecolor="black",
+      histtype="stepfilled",
   )
   ax[0].axvline(x=zero_line, color="C0", linestyle="--", linewidth=2)
 
@@ -161,6 +264,8 @@ def plot_deep_dive(
       color="C1",
       ax=ax[0],
       label="A/B absolute difference",
+      edgecolor="black",
+      histtype="stepfilled",
   )
   ax[0].axvline(x=mde, color="C1", linestyle="--", linewidth=2)
 
@@ -329,7 +434,7 @@ def plot_metric_over_time(
       nrows=2, figsize=(10, 6), sharex=True, constrained_layout=True
   )
 
-  is_test_or_test_1 = data["time_period"].isin(["test", "test_1"])
+  is_test_or_test_1 = data["time_period"].isin(["test", "test_1", "washout_1"])
   start_date = data.loc[is_test_or_test_1, "date"].min()
   pretest_start_date = start_date - dt.timedelta(weeks=design.pretest_weeks)
   end_date = start_date + dt.timedelta(weeks=design.runtime_weeks)
@@ -479,12 +584,11 @@ def _plot_horizontal_error_bar_with_infs(
 
 def plot_effects(
     data: pd.DataFrame,
-    metric_column_name: str,
-    relative_difference_column_name: str,
-    relative_difference_lower_bound_column_name: str,
-    relative_difference_upper_bound_column_name: str,
-    is_significant_column_name: str,
     design: experiment_design.ExperimentDesign,
+    relative_difference_column_name: str = "relative_difference",
+    relative_difference_lower_bound_column_name: str = "relative_difference_lower_bound",
+    relative_difference_upper_bound_column_name: str = "relative_difference_upper_bound",
+    is_significant_column_name: str = "is_significant",
 ) -> np.ndarray:
   """Plots the effects of the experiment for each metric provided.
 
@@ -495,21 +599,24 @@ def plot_effects(
     data: Experiment results containing the point estimate of the relative
       differences, their upper and lower bounds, and if the results are
       significant for each metric provided.
-    metric_column_name: Name of the column containing the metric name.
+    design: The design of the experiment.
     relative_difference_column_name: Name of the column containing the point
       estimated of the relative difference between the two samples.
     relative_difference_lower_bound_column_name: Name of the column containing
       the lower bound of the relative difference between the two samples.
     relative_difference_upper_bound_column_name: Name of the column containing
       the upper bound of the relative difference between the two samples.
-    is_significant: If the test is statistically significant for the given
-      metric.
+    is_significant_column_name: If the test is statistically significant for the
+      given metric.
 
   Returns:
     A plot showing the experiment result of the primary and additional metrics
+
+  Raises:
+    ValueError: If the primary metric is missing.
   """
   # Identify the primary metric in experiment results using the selected design
-  metrics = data.reset_index()[metric_column_name]
+  metrics = data.reset_index(names="metric_")["metric_"]
   is_primary_metric = (
       metrics.str.lower() == design.primary_metric.lower()
   ).values

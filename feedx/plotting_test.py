@@ -62,14 +62,15 @@ class PlotMetricHistoryTest(parameterized.TestCase):
     ax = plotting.plot_metric_history(self.plot_data, "impressions")
     self.assertIsInstance(ax, np.ndarray)
 
-  def test_plot_metric_history_returns_2_axes(self):
+  def test_plot_metric_history_returns_3_axes(self):
     ax = plotting.plot_metric_history(self.plot_data, "impressions")
-    self.assertTupleEqual(ax.shape, (2,))
+    self.assertTupleEqual(ax.shape, (3,))
 
   def test_plot_metric_history_returns_array_of_axes(self):
     ax = plotting.plot_metric_history(self.plot_data, "impressions")
     self.assertIsInstance(ax[0], plt.Axes)
     self.assertIsInstance(ax[1], plt.Axes)
+    self.assertIsInstance(ax[2], plt.Axes)
 
 
 @dataclasses.dataclass
@@ -500,7 +501,7 @@ class PlotEffectsTest(parameterized.TestCase):
             0.14331357952247625,
         ],
         "is_significant": [True, False, True, False, False],
-    })
+    }).set_index("metric")
 
     self.mock_design = MockExperimentDesignPlot(primary_metric="clicks")
     self.mock_design_none = MockExperimentDesignPlot(
@@ -510,15 +511,6 @@ class PlotEffectsTest(parameterized.TestCase):
   def test_plot_effects_returns_2_axes(self):
     ax = plotting.plot_effects(
         self.mock_results,
-        metric_column_name="metric",
-        relative_difference_column_name="relative_difference",
-        relative_difference_lower_bound_column_name=(
-            "relative_difference_lower_bound"
-        ),
-        relative_difference_upper_bound_column_name=(
-            "relative_difference_upper_bound"
-        ),
-        is_significant_column_name="is_significant",
         design=self.mock_design,
     )
     self.assertTupleEqual(ax.shape, (2,))
@@ -526,15 +518,6 @@ class PlotEffectsTest(parameterized.TestCase):
   def test_plot_effects_returns_array_of_axes(self):
     ax = plotting.plot_effects(
         self.mock_results,
-        metric_column_name="metric",
-        relative_difference_column_name="relative_difference",
-        relative_difference_lower_bound_column_name=(
-            "relative_difference_lower_bound"
-        ),
-        relative_difference_upper_bound_column_name=(
-            "relative_difference_upper_bound"
-        ),
-        is_significant_column_name="is_significant",
         design=self.mock_design,
     )
     self.assertIsInstance(ax[0], plt.Axes)
@@ -544,15 +527,6 @@ class PlotEffectsTest(parameterized.TestCase):
     with self.assertRaises(ValueError):
       plotting.plot_effects(
           self.mock_results,
-          metric_column_name="metric",
-          relative_difference_column_name="relative_difference",
-          relative_difference_lower_bound_column_name=(
-              "relative_difference_lower_bound"
-          ),
-          relative_difference_upper_bound_column_name=(
-              "relative_difference_upper_bound"
-          ),
-          is_significant_column_name="is_significant",
           design=self.mock_design_none,
       )
 
