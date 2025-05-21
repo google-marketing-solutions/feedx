@@ -385,7 +385,7 @@ class StatisticalTestResults:
   control_average: float
 
 
-def _ttest_from_stats(
+def ttest_from_stats(
     point_estimate: float,
     standard_error: float,
     degrees_of_freedom: int | float,
@@ -428,7 +428,7 @@ def _ttest_from_stats(
   return statistic, p_value
 
 
-def _absolute_difference_confidence_interval(
+def absolute_difference_confidence_interval(
     *,
     mean_1: float,
     mean_2: float,
@@ -505,7 +505,7 @@ def _absolute_difference_confidence_interval(
   return lower_bound, upper_bound
 
 
-def _relative_difference_confidence_interval(
+def relative_difference_confidence_interval(
     *,
     mean_1: float,
     mean_2: float,
@@ -573,10 +573,17 @@ def _relative_difference_confidence_interval(
   var_2 = standard_error_2**2
   var_12 = standard_error_1 * standard_error_2 * corr
 
-  t_exclusive_sq = mean_2**2 / var_2
-  t_complete_sq = (
-      mean_1**2 * var_2 - 2 * mean_2 * mean_1 * var_12 + mean_2**2 * var_1
-  ) / (var_1 * var_2 - var_12**2)
+  if np.isclose(var_2, 0.0):
+    t_exclusive_sq = np.inf
+  else:
+    t_exclusive_sq = mean_2**2 / var_2
+
+  if np.isclose(var_1, 0.0) or np.isclose(var_2, 0.0):
+    t_complete_sq = np.inf
+  else:
+    t_complete_sq = (
+        mean_1**2 * var_2 - 2 * mean_2 * mean_1 * var_12 + mean_2**2 * var_1
+    ) / (var_1 * var_2 - var_12**2)
 
   if alternative == "two-sided":
     critical_t_value = stats.t.ppf(df=degrees_of_freedom, q=1.0 - alpha / 2.0)
@@ -890,7 +897,7 @@ def yuens_t_test_paired(
     absolute_difference_standard_error = trimmed_standard_error[0]
     absolute_difference = trimmed_means[0]
 
-  statistic, p_value = _ttest_from_stats(
+  statistic, p_value = ttest_from_stats(
       point_estimate=absolute_difference,
       standard_error=absolute_difference_standard_error,
       degrees_of_freedom=degrees_of_freedom,
@@ -899,7 +906,7 @@ def yuens_t_test_paired(
   is_significant = p_value < alpha
 
   absolute_difference_lb, absolute_difference_ub = (
-      _absolute_difference_confidence_interval(
+      absolute_difference_confidence_interval(
           mean_1=mean_1,
           mean_2=mean_2,
           standard_error_1=standard_error_1,
@@ -916,7 +923,7 @@ def yuens_t_test_paired(
   if (mean_1 >= 0.0) and (mean_2 >= 0.0):
     relative_difference = mean_1 / mean_2 - 1.0
     relative_difference_lb, relative_difference_ub = (
-        _relative_difference_confidence_interval(
+        relative_difference_confidence_interval(
             mean_1=mean_1,
             mean_2=mean_2,
             standard_error_1=standard_error_1,
@@ -1083,7 +1090,7 @@ def yuens_t_test_ind(
 
   absolute_difference = mean1 - mean2
 
-  statistic, p_value = _ttest_from_stats(
+  statistic, p_value = ttest_from_stats(
       point_estimate=absolute_difference,
       standard_error=standard_error,
       degrees_of_freedom=degrees_of_freedom,
@@ -1092,7 +1099,7 @@ def yuens_t_test_ind(
   is_significant = p_value < alpha
 
   absolute_difference_lb, absolute_difference_ub = (
-      _absolute_difference_confidence_interval(
+      absolute_difference_confidence_interval(
           mean_1=mean1,
           mean_2=mean2,
           standard_error_1=standard_error_1,
@@ -1109,7 +1116,7 @@ def yuens_t_test_ind(
   if (mean1 >= 0.0) and (mean2 >= 0.0):
     relative_difference = mean1 / mean2 - 1.0
     relative_difference_lb, relative_difference_ub = (
-        _relative_difference_confidence_interval(
+        relative_difference_confidence_interval(
             mean_1=mean1,
             mean_2=mean2,
             standard_error_1=standard_error_1,

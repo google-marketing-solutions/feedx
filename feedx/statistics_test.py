@@ -1171,7 +1171,7 @@ class RelativeDifferenceConfidenceIntervalTest(parameterized.TestCase):
     degrees_of_freedom = 100
 
     point_estimate = mean_1 / mean_2 - 1
-    lb, ub = statistics._relative_difference_confidence_interval(
+    lb, ub = statistics.relative_difference_confidence_interval(
         mean_1=mean_1,
         mean_2=mean_2,
         standard_error_1=standard_error_1,
@@ -1197,7 +1197,7 @@ class RelativeDifferenceConfidenceIntervalTest(parameterized.TestCase):
     degrees_of_freedom = 100
 
     point_estimate = mean_1 / mean_2 - 1
-    lb, ub = statistics._relative_difference_confidence_interval(
+    lb, ub = statistics.relative_difference_confidence_interval(
         mean_1=mean_1,
         mean_2=mean_2,
         standard_error_1=standard_error_1,
@@ -1223,7 +1223,7 @@ class RelativeDifferenceConfidenceIntervalTest(parameterized.TestCase):
     degrees_of_freedom = 100
 
     point_estimate = mean_1 / mean_2 - 1
-    lb, ub = statistics._relative_difference_confidence_interval(
+    lb, ub = statistics.relative_difference_confidence_interval(
         mean_1=mean_1,
         mean_2=mean_2,
         standard_error_1=standard_error_1,
@@ -1250,7 +1250,7 @@ class RelativeDifferenceConfidenceIntervalTest(parameterized.TestCase):
     degrees_of_freedom = 100
 
     point_estimate = mean_1 / mean_2 - 1
-    lb, ub = statistics._relative_difference_confidence_interval(
+    lb, ub = statistics.relative_difference_confidence_interval(
         mean_1=mean_1,
         mean_2=mean_2,
         standard_error_1=standard_error_1,
@@ -1276,7 +1276,7 @@ class RelativeDifferenceConfidenceIntervalTest(parameterized.TestCase):
     degrees_of_freedom = 100
 
     point_estimate = mean_1 / mean_2 - 1
-    lb, ub = statistics._relative_difference_confidence_interval(
+    lb, ub = statistics.relative_difference_confidence_interval(
         mean_1=mean_1,
         mean_2=mean_2,
         standard_error_1=standard_error_1,
@@ -1300,7 +1300,7 @@ class RelativeDifferenceConfidenceIntervalTest(parameterized.TestCase):
     corr = 0.1
     degrees_of_freedom = 100
 
-    lb, ub = statistics._relative_difference_confidence_interval(
+    lb, ub = statistics.relative_difference_confidence_interval(
         mean_1=mean_1,
         mean_2=mean_2,
         standard_error_1=standard_error_1,
@@ -1323,7 +1323,7 @@ class RelativeDifferenceConfidenceIntervalTest(parameterized.TestCase):
     degrees_of_freedom = 100
 
     point_estimate = mean_1 / mean_2 - 1
-    lb, ub = statistics._relative_difference_confidence_interval(
+    lb, ub = statistics.relative_difference_confidence_interval(
         mean_1=mean_1,
         mean_2=mean_2,
         standard_error_1=standard_error_1,
@@ -1348,7 +1348,7 @@ class RelativeDifferenceConfidenceIntervalTest(parameterized.TestCase):
     corr = 0.1
     degrees_of_freedom = 100
 
-    lb, ub = statistics._relative_difference_confidence_interval(
+    lb, ub = statistics.relative_difference_confidence_interval(
         mean_1=mean_1,
         mean_2=mean_2,
         standard_error_1=standard_error_1,
@@ -1386,7 +1386,7 @@ class AbsoluteDifferenceConfidenceIntervalTest(parameterized.TestCase):
         scale=expected_standard_error,
     )
 
-    lb, ub = statistics._absolute_difference_confidence_interval(
+    lb, ub = statistics.absolute_difference_confidence_interval(
         mean_1=mean_1,
         mean_2=mean_2,
         standard_error_1=standard_error_1,
@@ -1423,7 +1423,7 @@ class AbsoluteDifferenceConfidenceIntervalTest(parameterized.TestCase):
         scale=expected_standard_error,
     )
 
-    lb, ub = statistics._absolute_difference_confidence_interval(
+    lb, ub = statistics.absolute_difference_confidence_interval(
         mean_1=mean_1,
         mean_2=mean_2,
         standard_error_1=standard_error_1,
@@ -1460,7 +1460,7 @@ class AbsoluteDifferenceConfidenceIntervalTest(parameterized.TestCase):
         scale=expected_standard_error,
     )
 
-    lb, ub = statistics._absolute_difference_confidence_interval(
+    lb, ub = statistics.absolute_difference_confidence_interval(
         mean_1=mean_1,
         mean_2=mean_2,
         standard_error_1=standard_error_1,
@@ -1485,7 +1485,7 @@ class AbsoluteDifferenceConfidenceIntervalTest(parameterized.TestCase):
     degrees_of_freedom = 100
 
     with self.assertRaises(ValueError):
-      statistics._absolute_difference_confidence_interval(
+      statistics.absolute_difference_confidence_interval(
           mean_1=mean_1,
           mean_2=mean_2,
           standard_error_1=standard_error_1,
