@@ -388,7 +388,7 @@ To cite this repository:
   author = {Sam Bailey and Amanda Rodriguez},
   title = {FeedX: Transparent, robust and trustworthy A/B experimentation for Shopping feeds},
   url = {https://github.com/google-marketing-solutions/feedx},
-  version = {0.1.0},
+  version = {0.1.1},
   year = {2024},
 }
 ```
