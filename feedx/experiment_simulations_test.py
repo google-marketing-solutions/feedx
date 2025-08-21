@@ -259,23 +259,51 @@ class ApplyRandomTreatmentAssignmentTests(parameterized.TestCase):
 
   def test_apply_random_treatment_assignment_creates_treatment_column(self):
     input_data = pd.DataFrame(
-        {"item_id": ["product_1", "product_2", "product_3", "product_4"]}
+        [
+            [100, 200],
+            [300, 400],
+            [500, 600],
+            [700, 800],
+        ],
+        index=pd.Index(
+            ["product_1", "product_2", "product_3", "product_4"], name="item_id"
+        ),
+        columns=pd.MultiIndex.from_product(
+            [["clicks"], ["pretest", "runtime"]]
+        ),
     )
     rng = np.random.default_rng(seed=123)
 
     actual_output_data = (
         experiment_simulations.apply_random_treatment_assignment(
-            input_data,
+            input_data.reset_index(),
             rng=rng,
             item_id_column="item_id",
             treatment_column="treatment_assignment",
         )
     )
 
-    expected_output_data = pd.DataFrame({
-        "item_id": ["product_1", "product_2", "product_3", "product_4"],
-        "treatment_assignment": [0, 1, 1, 0],
-    })
+    expected_output_data = pd.DataFrame(
+        [
+            [100, 200],
+            [300, 400],
+            [500, 600],
+            [700, 800],
+        ],
+        index=pd.MultiIndex.from_tuples(
+            [
+                ("product_1", 0),
+                ("product_2", 1),
+                ("product_3", 1),
+                ("product_4", 0),
+            ],
+            names=["item_id", "treatment_assignment"],
+        ),
+        columns=pd.MultiIndex.from_product(
+            [["clicks"], ["pretest", "runtime"]]
+        ),
+    )
+
     pd.testing.assert_frame_equal(actual_output_data, expected_output_data)
 
   def test_apply_random_treatment_assignment_raises_exception_if_treatment_column_exists(

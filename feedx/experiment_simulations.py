@@ -284,10 +284,24 @@ def apply_random_treatment_assignment(
   if item_id_column not in data.columns:
     raise ValueError("The data does not contain the item_id column.")
 
-  items = data[[item_id_column]].drop_duplicates()
+  # To do the merging we need to first flatten the columns. This is likely
+  # due to a bug in the current external version of pandas, so this is a
+  # workaround.
+  data_flat = data.copy()
+  data_flat.columns = [
+      "__".join(col).strip("_") for col in data_flat.columns.values
+  ]
+
+  items = data_flat[[item_id_column]].drop_duplicates()
   items[treatment_column] = rng.choice(2, size=len(items))
-  data = data.merge(items, on=item_id_column)
-  return data
+
+  data_flat = data_flat.merge(items, on=item_id_column).set_index(
+      [item_id_column, treatment_column]
+  )
+  data_flat.columns = pd.MultiIndex.from_tuples(
+      [tuple(col.split("__")) for col in data_flat.columns.values]
+  )
+  return data_flat
 
 
 def _apply_synthetic_treatment_effect_to_regular_experiment(
@@ -864,7 +878,6 @@ class SimulationAnalysis:
               item_id_column=self.item_id_column,
               treatment_column=self.treatment_column,
           )
-          .set_index([self.item_id_column, self.treatment_column])
       )
 
       aa_simulation_results_list.append(
