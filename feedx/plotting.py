@@ -242,7 +242,7 @@ def plot_deep_dive(
   # A/A effect distribution
   zero_line = 0.0
   _make_density_plot(
-      design_results.aa_simulation_results,
+      design_results.aa_simulation_results,  # pyrefly: ignore[bad-argument-type]
       column="absolute_difference",
       x_label="Effect Size",
       y_label="Density",
@@ -257,7 +257,7 @@ def plot_deep_dive(
   # A/B effect distribution
   mde = design_results.minimum_detectable_effect
   _make_density_plot(
-      design_results.ab_simulation_results,
+      design_results.ab_simulation_results,  # pyrefly: ignore[bad-argument-type]
       column="absolute_difference",
       x_label="Effect Size",
       y_label="Density",
@@ -279,7 +279,7 @@ def plot_deep_dive(
 
   # A/A p-value distribution
   _make_density_plot(
-      design_results.aa_simulation_results,
+      design_results.aa_simulation_results,  # pyrefly: ignore[bad-argument-type]
       column="p_value",
       x_label="P-Values (A/A)",
       y_label="Count",
@@ -296,7 +296,7 @@ def plot_deep_dive(
 
   # A/B p-value distribution
   _make_density_plot(
-      design_results.ab_simulation_results,
+      design_results.ab_simulation_results,  # pyrefly: ignore[bad-argument-type]
       column="p_value",
       x_label="P-Values (A/B)",
       y_label="Count",
@@ -465,14 +465,14 @@ def plot_metric_over_time(
 
   if design.is_crossover:
     test_period_weeks = (
-        design.runtime_weeks - 2 * design.crossover_washout_weeks
+        design.runtime_weeks - 2 * design.crossover_washout_weeks  # pyrefly: ignore[unsupported-operation]
     ) // 2
     test_period_1_start = start_date + dt.timedelta(
-        weeks=design.crossover_washout_weeks
+        weeks=design.crossover_washout_weeks  # pyrefly: ignore[bad-argument-type]
     )
     crossover = test_period_1_start + dt.timedelta(weeks=test_period_weeks)
     test_period_2_start = crossover + dt.timedelta(
-        weeks=design.crossover_washout_weeks
+        weeks=design.crossover_washout_weeks  # pyrefly: ignore[bad-argument-type]
     )
     ax[0].axvspan(
         start_date, test_period_1_start, color="k", alpha=0.1, label="Washout"
@@ -531,19 +531,19 @@ def _plot_horizontal_error_bar_with_infs(
   if len(y_position) == 0:
     return
 
-  y_position = np.asarray(y_position)
-  value = np.asarray(value)
-  value_lb = np.asarray(value_lb)
-  value_ub = np.asarray(value_ub)
+  y_position = np.asarray(y_position)  # pyrefly: ignore[bad-assignment]
+  value = np.asarray(value)  # pyrefly: ignore[bad-assignment]
+  value_lb = np.asarray(value_lb)  # pyrefly: ignore[bad-assignment]
+  value_ub = np.asarray(value_ub)  # pyrefly: ignore[bad-assignment]
 
   inf_lb = ~np.isfinite(value_lb)
   inf_ub = ~np.isfinite(value_ub)
 
-  value = np.copy(value)
+  value = np.copy(value)  # pyrefly: ignore[bad-assignment]
   value[~np.isfinite(value)] = 0.0  # If unknown, assume 0 impact
 
-  value_err_lb = value - value_lb
-  value_err_ub = value_ub - value
+  value_err_lb = value - value_lb  # pyrefly: ignore[unsupported-operation]
+  value_err_ub = value_ub - value  # pyrefly: ignore[unsupported-operation]
   value_err_lb[inf_lb] = (
       0.0  # set to 0. Infinite error bars are plotted separately
   )

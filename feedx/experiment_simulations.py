@@ -129,7 +129,7 @@ def generate_all_valid_designs(
 
     can_crossover = (
         crossover_design_allowed
-        & (runtime_weeks > 2 * crossover_washout_weeks)
+        & (runtime_weeks > 2 * crossover_washout_weeks)  # pyrefly: ignore[unsupported-operation]
         & (runtime_weeks % 2 == 0)
     )
 
@@ -633,8 +633,8 @@ class SimulationAnalysis:
       trimmed_means = trimmed_stacked_values.mean()
       trimmed_var = trimmed_stacked_values.var(ddof=1)
 
-      primary_metric_average = 0.5 * (trimmed_means[1] + trimmed_means[2])
-      primary_metric_variance = trimmed_var[0]
+      primary_metric_average = 0.5 * (trimmed_means[1] + trimmed_means[2])  # pyrefly: ignore[bad-index]
+      primary_metric_variance = trimmed_var[0]  # pyrefly: ignore[bad-index]
 
       # If we have post trimming, then we don't demean the metrics (to ensure
       # that the control average remains sensible). This means we need to add
@@ -642,7 +642,7 @@ class SimulationAnalysis:
       # periods.
       if self.design.post_trim_percentile > 0.0:
         primary_metric_variance += (
-            trimmed_means[1] - trimmed_means[2]
+            trimmed_means[1] - trimmed_means[2]  # pyrefly: ignore[bad-index]
         ) ** 2 / 4
 
       sample_size = len(trimmed_stacked_values)
@@ -760,12 +760,12 @@ class SimulationAnalysis:
       )
 
     relative_minimum_detectable_effect = (
-        minimum_detectable_effect / primary_metric_average
+        minimum_detectable_effect / primary_metric_average  # pyrefly: ignore[unsupported-operation]
     )
 
     return (
-        float(minimum_detectable_effect),
-        float(relative_minimum_detectable_effect),
+        float(minimum_detectable_effect),  # pyrefly: ignore[bad-argument-type]
+        float(relative_minimum_detectable_effect),  # pyrefly: ignore[bad-argument-type]
     )
 
   def estimate_minimum_detectable_effect(self) -> None:
@@ -951,7 +951,7 @@ class SimulationAnalysis:
     if self.aa_simulation_results is None:
       return None
 
-    return np.mean(self._aa_is_statistically_significant)
+    return np.mean(self._aa_is_statistically_significant)  # pyrefly: ignore[no-matching-overload]
 
   @property
   def false_positive_rate_robustness_p_value(self) -> float | None:
@@ -966,8 +966,8 @@ class SimulationAnalysis:
       return None
 
     return stats.binomtest(
-        k=np.sum(self._aa_is_statistically_significant),
-        n=len(self._aa_is_statistically_significant),
+        k=np.sum(self._aa_is_statistically_significant),  # pyrefly: ignore[no-matching-overload]
+        n=len(self._aa_is_statistically_significant),  # pyrefly: ignore[bad-argument-type]
         p=self.design.alpha,
         alternative="greater",
     ).pvalue
@@ -978,7 +978,7 @@ class SimulationAnalysis:
       return None
 
     return (
-        self.ab_simulation_results["p_value"].values < self.design.alpha
+        self.ab_simulation_results["p_value"].values < self.design.alpha  # pyrefly: ignore[unsupported-operation]
     ).astype(int)
 
   @property
@@ -996,7 +996,7 @@ class SimulationAnalysis:
     if self.aa_simulation_results is None:
       return None
 
-    return np.mean(self._ab_is_statistically_significant)
+    return np.mean(self._ab_is_statistically_significant)  # pyrefly: ignore[no-matching-overload]
 
   @property
   def power_robustness_p_value(self) -> float | None:
@@ -1013,8 +1013,8 @@ class SimulationAnalysis:
       return None
 
     return stats.binomtest(
-        k=np.sum(self._ab_is_statistically_significant),
-        n=len(self._ab_is_statistically_significant),
+        k=np.sum(self._ab_is_statistically_significant),  # pyrefly: ignore[no-matching-overload]
+        n=len(self._ab_is_statistically_significant),  # pyrefly: ignore[bad-argument-type]
         p=self.design.power,
         alternative="less",
     ).pvalue
@@ -1050,7 +1050,7 @@ class SimulationAnalysis:
       return None
 
     return stats.ttest_1samp(
-        self.ab_simulation_results["absolute_difference"].values,
+        self.ab_simulation_results["absolute_difference"].values,  # pyrefly: ignore[unsupported-operation]
         self.minimum_detectable_effect,
     ).pvalue
 
@@ -1141,7 +1141,7 @@ class SimulationAnalysis:
 
     summary_dict = dataclasses.asdict(self.design)
     summary_dict["design_id"] = self.design.design_id
-    del(summary_dict["coinflip_salt"])  # Not relevant for the summary
+    del(summary_dict["coinflip_salt"])  # Not relevant for the summary  # pyrefly: ignore[unsupported-delete]
 
     summary_metrics = [
         "minimum_detectable_effect",
@@ -1286,7 +1286,7 @@ def format_analysis_summary_dataframe(
     return list(filter(lambda x: x in summary_data.columns.values, columns))
 
   styled_summary_data = (
-      summary_data.style.set_caption(caption)
+      summary_data.style.set_caption(caption)  # pyrefly: ignore[missing-attribute]
       .bar(
           subset=_get_existing_summary_columns([
               "Minimum Detectable Effect",

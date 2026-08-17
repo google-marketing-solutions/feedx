@@ -225,10 +225,10 @@ class ExperimentDesign:
         f"\tTotal experiment runtime weeks: {self.runtime_weeks}",
     ]
     if self.is_crossover:
-      washout_weeks = list(range(1, self.crossover_washout_weeks + 1)) + list(
+      washout_weeks = list(range(1, self.crossover_washout_weeks + 1)) + list(  # pyrefly: ignore[unsupported-operation]
           range(
               self.runtime_weeks // 2 + 1,
-              self.runtime_weeks // 2 + self.crossover_washout_weeks + 1,
+              self.runtime_weeks // 2 + self.crossover_washout_weeks + 1,  # pyrefly: ignore[unsupported-operation]
           )
       )
       lines.extend([

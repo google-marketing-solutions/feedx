@@ -95,17 +95,17 @@ def _sample_from_lognormal(
     size: int | tuple[int, int],
 ) -> np.ndarray:
   """Samples from a lognormal distribution."""
-  valid_mean = mean > 0
-  valid_standard_deviation = standard_deviation > 0
+  valid_mean = mean > 0  # pyrefly: ignore[unsupported-operation]
+  valid_standard_deviation = standard_deviation > 0  # pyrefly: ignore[unsupported-operation]
   if not np.all(valid_mean):
     raise ValueError("mean must be greater than 0")
   if not np.all(valid_standard_deviation):
     raise ValueError("standard_deviation must be greater than 0")
 
   lognormal_mean = np.log(mean) - 0.5 * np.log(
-      standard_deviation**2 / mean**2 + 1
+      standard_deviation**2 / mean**2 + 1  # pyrefly: ignore[unsupported-operation]
   )
-  lognormal_sigma = np.sqrt(np.log(standard_deviation**2 / mean**2 + 1))
+  lognormal_sigma = np.sqrt(np.log(standard_deviation**2 / mean**2 + 1))  # pyrefly: ignore[unsupported-operation]
   return rng.lognormal(mean=lognormal_mean, sigma=lognormal_sigma, size=size)
 
 
@@ -116,17 +116,17 @@ def _sample_from_beta(
     size: int | tuple[int, int],
 ) -> np.ndarray:
   """Samples from a beta distribution."""
-  valid_mean = 0 < mean < 1
-  valid_standard_deviation = 0 < standard_deviation < 1
+  valid_mean = 0 < mean < 1  # pyrefly: ignore[unsupported-operation]
+  valid_standard_deviation = 0 < standard_deviation < 1  # pyrefly: ignore[unsupported-operation]
   if not np.all(valid_mean):
     raise ValueError("mean must be between 0 and 1")
   if not np.all(valid_standard_deviation):
     raise ValueError("standard_deviation must be between 0 and 1")
 
-  a_plus_b = np.sqrt(mean * (1.0 - mean)) / standard_deviation
+  a_plus_b = np.sqrt(mean * (1.0 - mean)) / standard_deviation  # pyrefly: ignore[unsupported-operation]
   return rng.beta(
       a=mean * a_plus_b,
-      b=(1.0 - mean) * a_plus_b,
+      b=(1.0 - mean) * a_plus_b,  # pyrefly: ignore[unsupported-operation]
       size=size,
   )
 
@@ -996,7 +996,7 @@ def _validate_coinflip_matches_assignments(
     item_id_column: str,
 ) -> tuple[bool, str]:
   actual_assignments = experiment_data[treatment_assignment_column].values
-  coinflip = experiment_design.Coinflip(salt=design.coinflip_salt)
+  coinflip = experiment_design.Coinflip(salt=design.coinflip_salt)  # pyrefly: ignore[bad-argument-type]
   expected_assignments = experiment_data[item_id_column].apply(coinflip).values
 
   if not np.array_equal(actual_assignments, expected_assignments):
@@ -1392,10 +1392,10 @@ def prepare_and_validate_historical_data(
   }
 
   if primary_metric == "other":
-    standardize_column_names_and_types_args["custom_columns"] = {
+    standardize_column_names_and_types_args["custom_columns"] = {  # pyrefly: ignore[bad-assignment]
         primary_metric_column: primary_metric_column
     }
-    standardize_column_names_and_types_args["custom_parse_functions"] = {
+    standardize_column_names_and_types_args["custom_parse_functions"] = {  # pyrefly: ignore[bad-assignment]
         primary_metric_column: lambda x: x.astype(float)
     }
     primary_metric = primary_metric_column
@@ -1738,7 +1738,7 @@ def perform_treatment_assignment(
 
   required_columns = {item_id_column}
   if design_has_pre_trimming & (week_id_column is not None):
-    required_columns.add(week_id_column)
+    required_columns.add(week_id_column)  # pyrefly: ignore[bad-argument-type]
   elif design_has_pre_trimming:
     raise ValueError("Must specify week_id_column if design has pre-trimming.")
 

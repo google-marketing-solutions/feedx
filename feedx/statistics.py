@@ -23,7 +23,7 @@ from scipy import stats
 
 def _any_array_is_constant(x: np.ndarray) -> bool:
   """Returns True if any of the arrays are constant aross axis 1."""
-  return np.any(np.all(np.isclose(x, x[:, np.newaxis, 0]), axis=1))
+  return np.any(np.all(np.isclose(x, x[:, np.newaxis, 0]), axis=1))  # pyrefly: ignore[bad-return]
 
 
 class TrimmedArray:
@@ -314,7 +314,7 @@ def apply_cuped_adjustment(
 
   trimmed_covariance_matrix = trimmed_metric_and_covariate.cov()
   trimmed_theta = (
-      trimmed_covariance_matrix[1, 2] / trimmed_covariance_matrix[2, 2]
+      trimmed_covariance_matrix[1, 2] / trimmed_covariance_matrix[2, 2]  # pyrefly: ignore[bad-index]
   )
   cuped_metric_no_offset = metric - trimmed_theta * covariate
 
@@ -652,7 +652,7 @@ def _one_sample_degrees_of_freedom(sample_size: npt.ArrayLike) -> npt.ArrayLike:
   Args:
     sample_size: The number of observations in the sample.
   """
-  return sample_size - 1
+  return sample_size - 1  # pyrefly: ignore[unsupported-operation]
 
 
 def _two_sample_standard_errors(
@@ -682,21 +682,21 @@ def _two_sample_standard_errors(
   """
   if equal_var:
     pooled_var = (
-        (sample_size_1 - 1) * standard_deviation_1**2
-        + (sample_size_2 - 1) * standard_deviation_2**2
-    ) / (sample_size_1 + sample_size_2 - 2)
+        (sample_size_1 - 1) * standard_deviation_1**2  # pyrefly: ignore[unsupported-operation]
+        + (sample_size_2 - 1) * standard_deviation_2**2  # pyrefly: ignore[unsupported-operation]
+    ) / (sample_size_1 + sample_size_2 - 2)  # pyrefly: ignore[unsupported-operation]
     standard_error_difference = np.sqrt(
-        pooled_var / sample_size_1 + pooled_var / sample_size_2
+        pooled_var / sample_size_1 + pooled_var / sample_size_2  # pyrefly: ignore[unsupported-operation]
     )
-    standard_error_1 = np.sqrt(pooled_var / sample_size_1)
-    standard_error_2 = np.sqrt(pooled_var / sample_size_2)
+    standard_error_1 = np.sqrt(pooled_var / sample_size_1)  # pyrefly: ignore[unsupported-operation]
+    standard_error_2 = np.sqrt(pooled_var / sample_size_2)  # pyrefly: ignore[unsupported-operation]
   else:
     standard_error_difference = np.sqrt(
-        standard_deviation_1**2 / sample_size_1
-        + standard_deviation_2**2 / sample_size_2
+        standard_deviation_1**2 / sample_size_1  # pyrefly: ignore[unsupported-operation]
+        + standard_deviation_2**2 / sample_size_2  # pyrefly: ignore[unsupported-operation]
     )
-    standard_error_1 = np.sqrt(standard_deviation_1**2 / sample_size_1)
-    standard_error_2 = np.sqrt(standard_deviation_2**2 / sample_size_2)
+    standard_error_1 = np.sqrt(standard_deviation_1**2 / sample_size_1)  # pyrefly: ignore[unsupported-operation]
+    standard_error_2 = np.sqrt(standard_deviation_2**2 / sample_size_2)  # pyrefly: ignore[unsupported-operation]
 
   return standard_error_difference, standard_error_1, standard_error_2
 
@@ -721,14 +721,14 @@ def _two_sample_degrees_of_freedom(
     equal_var: Should the test assume both samples have equal variances?
   """
   if equal_var:
-    return sample_size_1 + sample_size_2 - 2
+    return sample_size_1 + sample_size_2 - 2  # pyrefly: ignore[unsupported-operation]
   else:
     return (
-        standard_deviation_1**2 / sample_size_1
-        + standard_deviation_2**2 / sample_size_2
+        standard_deviation_1**2 / sample_size_1  # pyrefly: ignore[unsupported-operation]
+        + standard_deviation_2**2 / sample_size_2  # pyrefly: ignore[unsupported-operation]
     ) ** 2 / (
-        (standard_deviation_1**2 / sample_size_1) ** 2 / (sample_size_1 - 1)
-        + (standard_deviation_2**2 / sample_size_2) ** 2 / (sample_size_2 - 1)
+        (standard_deviation_1**2 / sample_size_1) ** 2 / (sample_size_1 - 1)  # pyrefly: ignore[unsupported-operation]
+        + (standard_deviation_2**2 / sample_size_2) ** 2 / (sample_size_2 - 1)  # pyrefly: ignore[unsupported-operation]
     )
 
 
@@ -846,7 +846,7 @@ def yuens_t_test_paired(
     )
 
   if is_ratio_metric:
-    stacked_values = np.stack(
+    stacked_values = np.stack(  # pyrefly: ignore[no-matching-overload]
         [values1 - values2, values1, denom_values1, values2, denom_values2]
     )
     trimmed_values = TrimmedArray(stacked_values, trimming_quantile)
@@ -862,7 +862,7 @@ def yuens_t_test_paired(
         var_2,
         corr,
     ) = _difference_of_ratios_mean_and_variance(
-        trimmed_means[1:], trimmed_cov[1:, 1:]
+        trimmed_means[1:], trimmed_cov[1:, 1:]  # pyrefly: ignore[bad-index]
     )
 
     standard_error_1 = _one_sample_standard_error(
@@ -889,18 +889,18 @@ def yuens_t_test_paired(
         trimmed_values.std(ddof=1), len(trimmed_values)
     )
 
-    _, mean_1, mean_2 = trimmed_means
-    _, standard_error_1, standard_error_2 = trimmed_standard_error
+    _, mean_1, mean_2 = trimmed_means  # pyrefly: ignore[not-iterable]
+    _, standard_error_1, standard_error_2 = trimmed_standard_error  # pyrefly: ignore[not-iterable]
     sample_size = len(trimmed_values)
     degrees_of_freedom = _one_sample_degrees_of_freedom(sample_size)
-    corr = trimmed_cov[1, 2] / np.sqrt(trimmed_cov[1, 1] * trimmed_cov[2, 2])
-    absolute_difference_standard_error = trimmed_standard_error[0]
-    absolute_difference = trimmed_means[0]
+    corr = trimmed_cov[1, 2] / np.sqrt(trimmed_cov[1, 1] * trimmed_cov[2, 2])  # pyrefly: ignore[bad-index]
+    absolute_difference_standard_error = trimmed_standard_error[0]  # pyrefly: ignore[bad-index]
+    absolute_difference = trimmed_means[0]  # pyrefly: ignore[bad-index]
 
   statistic, p_value = ttest_from_stats(
       point_estimate=absolute_difference,
-      standard_error=absolute_difference_standard_error,
-      degrees_of_freedom=degrees_of_freedom,
+      standard_error=absolute_difference_standard_error,  # pyrefly: ignore[bad-argument-type]
+      degrees_of_freedom=degrees_of_freedom,  # pyrefly: ignore[bad-argument-type]
       alternative=alternative,
   )
   is_significant = p_value < alpha
@@ -909,10 +909,10 @@ def yuens_t_test_paired(
       absolute_difference_confidence_interval(
           mean_1=mean_1,
           mean_2=mean_2,
-          standard_error_1=standard_error_1,
-          standard_error_2=standard_error_2,
+          standard_error_1=standard_error_1,  # pyrefly: ignore[bad-argument-type]
+          standard_error_2=standard_error_2,  # pyrefly: ignore[bad-argument-type]
           corr=corr,
-          degrees_of_freedom=degrees_of_freedom,
+          degrees_of_freedom=degrees_of_freedom,  # pyrefly: ignore[bad-argument-type]
           alpha=alpha,
           alternative=alternative,
       )
@@ -926,10 +926,10 @@ def yuens_t_test_paired(
         relative_difference_confidence_interval(
             mean_1=mean_1,
             mean_2=mean_2,
-            standard_error_1=standard_error_1,
-            standard_error_2=standard_error_2,
+            standard_error_1=standard_error_1,  # pyrefly: ignore[bad-argument-type]
+            standard_error_2=standard_error_2,  # pyrefly: ignore[bad-argument-type]
             corr=corr,
-            degrees_of_freedom=degrees_of_freedom,
+            degrees_of_freedom=degrees_of_freedom,  # pyrefly: ignore[bad-argument-type]
             alpha=alpha,
             alternative=alternative,
         )
@@ -950,9 +950,9 @@ def yuens_t_test_paired(
       relative_difference=relative_difference,
       relative_difference_lower_bound=relative_difference_lb,
       relative_difference_upper_bound=relative_difference_ub,
-      standard_error=absolute_difference_standard_error,
+      standard_error=absolute_difference_standard_error,  # pyrefly: ignore[bad-argument-type]
       sample_size=sample_size,
-      degrees_of_freedom=degrees_of_freedom,
+      degrees_of_freedom=degrees_of_freedom,  # pyrefly: ignore[bad-argument-type]
       control_average=mean_2,
   )
 
@@ -1036,8 +1036,8 @@ def yuens_t_test_ind(
     )
 
   if is_ratio_metric:
-    stacked_values1 = np.stack([values1, denom_values1])
-    stacked_values2 = np.stack([values2, denom_values2])
+    stacked_values1 = np.stack([values1, denom_values1])  # pyrefly: ignore[no-matching-overload]
+    stacked_values2 = np.stack([values2, denom_values2])  # pyrefly: ignore[no-matching-overload]
     trimmed_values1 = TrimmedArray(stacked_values1, trimming_quantile)
     trimmed_values2 = TrimmedArray(stacked_values2, trimming_quantile)
     trimmed_means_1 = trimmed_values1.mean()
@@ -1046,18 +1046,18 @@ def yuens_t_test_ind(
     trimmed_cov_matrix_2 = trimmed_values2.cov(ddof=1)
 
     mean1, var1 = _ratio_mean_and_variance(
-        mean_1=trimmed_means_1[0],
-        mean_2=trimmed_means_1[1],
-        var_1=trimmed_cov_matrix_1[0, 0],
-        var_2=trimmed_cov_matrix_1[1, 1],
-        cov_12=trimmed_cov_matrix_1[0, 1],
+        mean_1=trimmed_means_1[0],  # pyrefly: ignore[bad-index]
+        mean_2=trimmed_means_1[1],  # pyrefly: ignore[bad-index]
+        var_1=trimmed_cov_matrix_1[0, 0],  # pyrefly: ignore[bad-index]
+        var_2=trimmed_cov_matrix_1[1, 1],  # pyrefly: ignore[bad-index]
+        cov_12=trimmed_cov_matrix_1[0, 1],  # pyrefly: ignore[bad-index]
     )
     mean2, var2 = _ratio_mean_and_variance(
-        mean_1=trimmed_means_2[0],
-        mean_2=trimmed_means_2[1],
-        var_1=trimmed_cov_matrix_2[0, 0],
-        var_2=trimmed_cov_matrix_2[1, 1],
-        cov_12=trimmed_cov_matrix_2[0, 1],
+        mean_1=trimmed_means_2[0],  # pyrefly: ignore[bad-index]
+        mean_2=trimmed_means_2[1],  # pyrefly: ignore[bad-index]
+        var_1=trimmed_cov_matrix_2[0, 0],  # pyrefly: ignore[bad-index]
+        var_2=trimmed_cov_matrix_2[1, 1],  # pyrefly: ignore[bad-index]
+        cov_12=trimmed_cov_matrix_2[0, 1],  # pyrefly: ignore[bad-index]
     )
     n1 = len(trimmed_values1)
     n2 = len(trimmed_values2)
@@ -1091,21 +1091,21 @@ def yuens_t_test_ind(
   absolute_difference = mean1 - mean2
 
   statistic, p_value = ttest_from_stats(
-      point_estimate=absolute_difference,
-      standard_error=standard_error,
-      degrees_of_freedom=degrees_of_freedom,
+      point_estimate=absolute_difference,  # pyrefly: ignore[bad-argument-type]
+      standard_error=standard_error,  # pyrefly: ignore[bad-argument-type]
+      degrees_of_freedom=degrees_of_freedom,  # pyrefly: ignore[bad-argument-type]
       alternative=alternative,
   )
   is_significant = p_value < alpha
 
   absolute_difference_lb, absolute_difference_ub = (
       absolute_difference_confidence_interval(
-          mean_1=mean1,
-          mean_2=mean2,
-          standard_error_1=standard_error_1,
-          standard_error_2=standard_error_2,
+          mean_1=mean1,  # pyrefly: ignore[bad-argument-type]
+          mean_2=mean2,  # pyrefly: ignore[bad-argument-type]
+          standard_error_1=standard_error_1,  # pyrefly: ignore[bad-argument-type]
+          standard_error_2=standard_error_2,  # pyrefly: ignore[bad-argument-type]
           corr=0.0,
-          degrees_of_freedom=degrees_of_freedom,
+          degrees_of_freedom=degrees_of_freedom,  # pyrefly: ignore[bad-argument-type]
           alpha=alpha,
           alternative=alternative,
       )
@@ -1117,12 +1117,12 @@ def yuens_t_test_ind(
     relative_difference = mean1 / mean2 - 1.0
     relative_difference_lb, relative_difference_ub = (
         relative_difference_confidence_interval(
-            mean_1=mean1,
-            mean_2=mean2,
-            standard_error_1=standard_error_1,
-            standard_error_2=standard_error_2,
+            mean_1=mean1,  # pyrefly: ignore[bad-argument-type]
+            mean_2=mean2,  # pyrefly: ignore[bad-argument-type]
+            standard_error_1=standard_error_1,  # pyrefly: ignore[bad-argument-type]
+            standard_error_2=standard_error_2,  # pyrefly: ignore[bad-argument-type]
             corr=0.0,
-            degrees_of_freedom=degrees_of_freedom,
+            degrees_of_freedom=degrees_of_freedom,  # pyrefly: ignore[bad-argument-type]
             alpha=alpha,
             alternative=alternative,
         )
@@ -1137,16 +1137,16 @@ def yuens_t_test_ind(
       p_value=p_value,
       alpha=alpha,
       is_significant=is_significant,
-      absolute_difference=absolute_difference,
+      absolute_difference=absolute_difference,  # pyrefly: ignore[bad-argument-type]
       absolute_difference_lower_bound=absolute_difference_lb,
       absolute_difference_upper_bound=absolute_difference_ub,
-      relative_difference=relative_difference,
+      relative_difference=relative_difference,  # pyrefly: ignore[bad-argument-type]
       relative_difference_lower_bound=relative_difference_lb,
       relative_difference_upper_bound=relative_difference_ub,
-      standard_error=standard_error,
+      standard_error=standard_error,  # pyrefly: ignore[bad-argument-type]
       sample_size=n1 + n2,
-      degrees_of_freedom=degrees_of_freedom,
-      control_average=mean2,
+      degrees_of_freedom=degrees_of_freedom,  # pyrefly: ignore[bad-argument-type]
+      control_average=mean2,  # pyrefly: ignore[bad-argument-type]
   )
 
 
@@ -1240,7 +1240,7 @@ def yuens_t_test_ind_minimum_detectable_effect(
   Returns:
     The minimum detectable absolute effect size.
   """
-  sample_size_per_variant = 0.5 * sample_size
+  sample_size_per_variant = 0.5 * sample_size  # pyrefly: ignore[unsupported-operation]
 
   standard_error, _, _ = _two_sample_standard_errors(
       standard_deviation_1=standard_deviation,
@@ -1258,8 +1258,8 @@ def yuens_t_test_ind_minimum_detectable_effect(
   )
 
   minimum_detectable_effect = calculate_minimum_detectable_effect_from_stats(
-      standard_error=standard_error,
-      degrees_of_freedom=degrees_of_freedom,
+      standard_error=standard_error,  # pyrefly: ignore[bad-argument-type]
+      degrees_of_freedom=degrees_of_freedom,  # pyrefly: ignore[bad-argument-type]
       alternative=alternative,
       power=power,
       alpha=alpha,
@@ -1318,8 +1318,8 @@ def yuens_t_test_paired_minimum_detectable_effect(
   degrees_of_freedom = _one_sample_degrees_of_freedom(sample_size)
 
   return calculate_minimum_detectable_effect_from_stats(
-      standard_error=standard_error,
-      degrees_of_freedom=degrees_of_freedom,
+      standard_error=standard_error,  # pyrefly: ignore[bad-argument-type]
+      degrees_of_freedom=degrees_of_freedom,  # pyrefly: ignore[bad-argument-type]
       alternative=alternative,
       power=power,
       alpha=alpha,

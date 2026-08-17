@@ -182,7 +182,7 @@ def add_time_period_column(
         start_week_id=start_week_id,
         pretest_weeks=design.pretest_weeks,
         runtime_weeks=design.runtime_weeks,
-        crossover_washout_weeks=design.crossover_washout_weeks,
+        crossover_washout_weeks=design.crossover_washout_weeks,  # pyrefly: ignore[bad-argument-type]
         week_id_column=week_id_column,
         time_period_column=time_period_column,
     )
@@ -439,7 +439,7 @@ def pivot_time_assignment(
         start_week_id=start_week_id,
         pretest_weeks=design.pretest_weeks,
         runtime_weeks=design.runtime_weeks,
-        crossover_washout_weeks=design.crossover_washout_weeks,
+        crossover_washout_weeks=design.crossover_washout_weeks,  # pyrefly: ignore[bad-argument-type]
         metric_columns=metric_columns,
         item_id_column=item_id_column,
         week_id_column=week_id_column,
@@ -718,7 +718,7 @@ def analyze_single_metric(
   missing_columns = required_columns - set(data_metric_subset.columns)
   if denominator_metric_name is not None:
     missing_columns.update(
-        required_columns - set(denominator_metric_subset.columns)
+        required_columns - set(denominator_metric_subset.columns)  # pyrefly: ignore[missing-attribute]
     )
 
   if missing_columns:
@@ -1036,7 +1036,7 @@ def format_experiment_analysis_results_dataframe(
   table_styles = [cell_hover, index_names, headers]
   return (
       display_data.style.hide(hide_columns, axis="columns")
-      .set_table_styles(table_styles)
+      .set_table_styles(table_styles)  # pyrefly: ignore[bad-argument-type]
       .set_table_styles(
           [
               {"selector": "th.col_heading", "props": "text-align: center;"},
