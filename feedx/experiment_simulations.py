@@ -866,7 +866,7 @@ class SimulationAnalysis:
       simulations_iterator = range(n_simulations)
 
     for _ in simulations_iterator:
-      start_week_id = self.rng.choice(self.valid_start_week_ids)
+      start_week_id = int(self.rng.choice(self.valid_start_week_ids))
       simulated_aa_test_data = (
           self._get_pivoted_and_trimmed_historical_data(
               start_week_id, bootstrap_sample=True
