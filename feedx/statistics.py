@@ -774,7 +774,7 @@ def _difference_of_ratios_mean_and_variance(
 
   corr_12 = (var_1 + var_2 - difference_var) / (2 * np.sqrt(var_1 * var_2))
 
-  return difference_mean, difference_var, mean_1, mean_2, var_1, var_2, corr_12
+  return difference_mean, difference_var, mean_1, mean_2, var_1, var_2, corr_12  # pyrefly: ignore[bad-return]
 
 
 def yuens_t_test_paired(
